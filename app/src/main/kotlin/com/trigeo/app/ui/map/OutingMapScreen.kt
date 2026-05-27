@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -59,6 +60,7 @@ fun OutingMapScreen(
     var showCapture by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Reading?>(null) }
     var showPanel by remember { mutableStateOf(false) }
+    val panelOpen = showCapture || editTarget != null
 
     Scaffold(
         topBar = {
@@ -72,77 +74,80 @@ fun OutingMapScreen(
             )
         },
         floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SmallFloatingActionButton(onClick = { showPanel = true }) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Readings")
+            if (!panelOpen) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SmallFloatingActionButton(onClick = { showPanel = true }) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Readings")
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            if (!permission.granted) permission.request()
+                            showCapture = true
+                        },
+                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        text = { Text("Add reading") },
+                    )
                 }
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        if (!permission.granted) permission.request()
-                        showCapture = true
-                    },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text("Add reading") },
-                )
             }
         },
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            OutingMap(
-                readings = readings,
-                cameraTarget = cameraTarget,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-
-    if (showCapture) {
-        ReadingSheet(
-            title = "Add reading",
-            initial = ReadingDraft(),
-            locationPermissionGranted = permission.granted,
-            onRequestPermission = permission.request,
-            liveLocation = liveLocation,
-            liveCompass = liveCompass,
-            onSave = { point, bearing, name ->
-                viewModel.createReading(point, bearing, name)
-                showCapture = false
-            },
-            onDismiss = { showCapture = false },
-        )
-    }
-
-    editTarget?.let { reading ->
-        ReadingSheet(
-            title = "Edit reading",
-            initial = ReadingDraft(
-                name = reading.name.orEmpty(),
-                useGps = false,
-                manualLat = "%.6f".format(reading.point.latitude),
-                manualLon = "%.6f".format(reading.point.longitude),
-                useCompass = false,
-                manualBearingDeg = "%.1f".format(reading.bearing.centerDeg),
-                uncertaintyDeg = reading.bearing.uncertaintyDeg.toFloat(),
-            ),
-            locationPermissionGranted = permission.granted,
-            onRequestPermission = permission.request,
-            liveLocation = liveLocation,
-            liveCompass = liveCompass,
-            onSave = { point, bearing, name ->
-                viewModel.updateReading(
-                    reading.copy(point = point, bearing = bearing, name = name),
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                OutingMap(
+                    readings = readings,
+                    cameraTarget = cameraTarget,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                editTarget = null
-            },
-            onDelete = {
-                viewModel.deleteReading(reading.id)
-                editTarget = null
-            },
-            onDismiss = { editTarget = null },
-        )
+            }
+            if (showCapture) {
+                ReadingPanel(
+                    title = "Add reading",
+                    initial = ReadingDraft(),
+                    locationPermissionGranted = permission.granted,
+                    onRequestPermission = permission.request,
+                    liveLocation = liveLocation,
+                    liveCompass = liveCompass,
+                    onSave = { point, bearing, name ->
+                        viewModel.createReading(point, bearing, name)
+                        showCapture = false
+                    },
+                    onDismiss = { showCapture = false },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+            } else editTarget?.let { reading ->
+                ReadingPanel(
+                    title = "Edit reading",
+                    initial = ReadingDraft(
+                        name = reading.name.orEmpty(),
+                        useGps = false,
+                        manualLat = "%.6f".format(reading.point.latitude),
+                        manualLon = "%.6f".format(reading.point.longitude),
+                        bearingMode = BearingMode.CUSTOM,
+                        manualBearingDeg = "%.1f".format(reading.bearing.centerDeg),
+                        uncertaintyDeg = reading.bearing.uncertaintyDeg.toFloat(),
+                    ),
+                    locationPermissionGranted = permission.granted,
+                    onRequestPermission = permission.request,
+                    liveLocation = liveLocation,
+                    liveCompass = liveCompass,
+                    onSave = { point, bearing, name ->
+                        viewModel.updateReading(
+                            reading.copy(point = point, bearing = bearing, name = name),
+                        )
+                        editTarget = null
+                    },
+                    onDelete = {
+                        viewModel.deleteReading(reading.id)
+                        editTarget = null
+                    },
+                    onDismiss = { editTarget = null },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+            }
+        }
     }
 
     if (showPanel) {

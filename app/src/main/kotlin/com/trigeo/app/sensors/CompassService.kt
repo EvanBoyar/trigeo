@@ -85,7 +85,13 @@ class CompassService(context: Context) {
                     PhoneOrientation.FLAT
                 }
 
-                val azimuthRad = if (orientation == PhoneOrientation.UPRIGHT_PORTRAIT) {
+                val magneticDeg = if (orientation == PhoneOrientation.UPRIGHT_PORTRAIT) {
+                    // The remap below leaves the new "device Y" axis aligned
+                    // with the original device Z (screen normal, toward the
+                    // user). The right-handed-system constraint inside
+                    // remapCoordinateSystem prevents us from flipping that
+                    // sign directly, so we add 180 degrees to get the back of
+                    // the phone (toward the signal) instead.
                     SensorManager.remapCoordinateSystem(
                         R,
                         SensorManager.AXIS_X,
@@ -93,12 +99,10 @@ class CompassService(context: Context) {
                         Rremap,
                     )
                     SensorManager.getOrientation(Rremap, orientationOut)
-                    orientationOut[0].toDouble()
+                    Angles.normalize(Math.toDegrees(orientationOut[0].toDouble()) + 180.0)
                 } else {
-                    orientationOut[0].toDouble()
+                    Angles.normalize(Math.toDegrees(orientationOut[0].toDouble()))
                 }
-
-                val magneticDeg = Angles.normalize(Math.toDegrees(azimuthRad))
 
                 val lat = latitudeProvider().toFloat()
                 val lon = longitudeProvider().toFloat()
