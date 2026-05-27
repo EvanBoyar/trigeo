@@ -1,6 +1,7 @@
 package com.trigeo.app.ui.outings
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,6 +64,7 @@ fun OutingsListScreen(
 ) {
     val context = LocalContext.current
     val outings by viewModel.outings.collectAsState()
+    val tipEnabled by viewModel.tipButtonEnabled.collectAsState()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var showCreate by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
@@ -101,25 +105,46 @@ fun OutingsListScreen(
             )
         },
     ) { padding ->
-        if (outings.isEmpty()) {
-            EmptyState(padding)
-        } else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = padding.calculateTopPadding() + 8.dp,
-                    bottom = padding.calculateBottomPadding() + 96.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                items(items = outings, key = { it.id }) { outing ->
-                    OutingRow(
-                        outing = outing,
-                        onClick = { onOpen(outing) },
-                        onLongPress = { manageTarget = outing },
-                    )
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (outings.isEmpty()) {
+                EmptyState(padding)
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = padding.calculateTopPadding() + 8.dp,
+                        bottom = padding.calculateBottomPadding() + 96.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(items = outings, key = { it.id }) { outing ->
+                        OutingRow(
+                            outing = outing,
+                            onClick = { onOpen(outing) },
+                            onLongPress = { manageTarget = outing },
+                        )
+                    }
+                }
+            }
+            if (tipEnabled) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/elbow"))
+                        )
+                    },
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(
+                            start = 16.dp,
+                            bottom = padding.calculateBottomPadding() + 16.dp,
+                        ),
+                ) {
+                    Icon(Icons.Filled.Favorite, contentDescription = "Tip")
                 }
             }
         }

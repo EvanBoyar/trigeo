@@ -35,6 +35,13 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setDefaultUncertaintyDeg(value) }
     }
 
+    val tipButtonEnabled: StateFlow<Boolean> = repo.tipButtonEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    fun setTipButtonEnabled(value: Boolean) {
+        viewModelScope.launch { repo.setTipButtonEnabled(value) }
+    }
+
     val offlineRegions: StateFlow<List<OfflineRegionInfo>> = offlineRegionsRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

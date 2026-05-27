@@ -46,9 +46,17 @@ class SettingsRepository(context: Context) {
         store.edit { it[KEY_DEFAULT_UNCERTAINTY] = value.coerceIn(1f, 30f) }
     }
 
+    val tipButtonEnabled: Flow<Boolean> =
+        store.data.map { it[KEY_TIP_BUTTON_ENABLED] ?: true }
+
+    suspend fun setTipButtonEnabled(value: Boolean) {
+        store.edit { it[KEY_TIP_BUTTON_ENABLED] = value }
+    }
+
     private companion object {
         val KEY_DEFAULT_BIDIRECTIONAL = booleanPreferencesKey("default_bidirectional")
         val KEY_TILE_STYLE = stringPreferencesKey("tile_style")
         val KEY_DEFAULT_UNCERTAINTY = floatPreferencesKey("default_uncertainty_deg")
+        val KEY_TIP_BUTTON_ENABLED = booleanPreferencesKey("tip_button_enabled")
     }
 }

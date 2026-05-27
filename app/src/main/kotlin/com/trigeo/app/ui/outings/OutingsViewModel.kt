@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
+import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.io.OutingShareCodec
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,10 +18,14 @@ import java.util.UUID
 class OutingsViewModel(
     private val repo: OutingsRepository,
     private val readingsRepo: ReadingsRepository,
+    settingsRepo: SettingsRepository,
 ) : ViewModel() {
 
     val outings: StateFlow<List<Outing>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val tipButtonEnabled: StateFlow<Boolean> = settingsRepo.tipButtonEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     fun create(name: String?, onCreated: (Outing) -> Unit = {}) {
         viewModelScope.launch {
@@ -92,11 +97,12 @@ class OutingsViewModel(
         fun factory(
             repo: OutingsRepository,
             readingsRepo: ReadingsRepository,
+            settingsRepo: SettingsRepository,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    OutingsViewModel(repo, readingsRepo) as T
+                    OutingsViewModel(repo, readingsRepo, settingsRepo) as T
             }
     }
 }

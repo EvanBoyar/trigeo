@@ -41,6 +41,7 @@ fun SettingsScreen(
 ) {
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
+    val tipButtonEnabled by viewModel.tipButtonEnabled.collectAsState()
     val offlineRegions by viewModel.offlineRegions.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -85,6 +86,12 @@ fun SettingsScreen(
                 regions = offlineRegions,
                 onDelete = viewModel::deleteRegion,
                 onAddRegion = onAddRegion,
+            )
+            SwitchRow(
+                title = "Show tip button",
+                subtitle = "A small heart button on the home screen that opens a tip page.",
+                checked = tipButtonEnabled,
+                onChange = viewModel::setTipButtonEnabled,
             )
         }
     }

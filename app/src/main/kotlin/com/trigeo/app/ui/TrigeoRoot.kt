@@ -24,7 +24,11 @@ fun TrigeoRoot() {
     NavHost(navController = nav, startDestination = "outings") {
         composable("outings") {
             val vm: OutingsViewModel = viewModel(
-                factory = OutingsViewModel.factory(app.outingsRepository, app.readingsRepository),
+                factory = OutingsViewModel.factory(
+                    app.outingsRepository,
+                    app.readingsRepository,
+                    app.settingsRepository,
+                ),
             )
             OutingsListScreen(
                 viewModel = vm,
