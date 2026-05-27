@@ -80,6 +80,7 @@ fun OutingMapScreen(
     }
 
     var showCapture by remember { mutableStateOf(false) }
+    var longPressPoint by remember { mutableStateOf<GeoPoint?>(null) }
     var editTarget by remember { mutableStateOf<Reading?>(null) }
     var showPanel by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
@@ -162,15 +163,24 @@ fun OutingMapScreen(
                     liveBidirectional = defaultBidirectional,
                     tileStyle = tileStyle,
                     fix = fix,
+                    onLongPress = { point ->
+                        if (!panelOpen) {
+                            longPressPoint = point
+                            showCapture = true
+                        }
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
             }
             if (showCapture) {
                 ReadingPanel(
-                    title = "Add reading",
+                    title = if (longPressPoint != null) "Add reading at point" else "Add reading",
                     initial = ReadingDraft(
                         bidirectional = defaultBidirectional,
                         uncertaintyDeg = defaultUncertaintyDeg,
+                        useGps = longPressPoint == null,
+                        manualLat = longPressPoint?.latitude?.let { "%.6f".format(it) }.orEmpty(),
+                        manualLon = longPressPoint?.longitude?.let { "%.6f".format(it) }.orEmpty(),
                     ),
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
@@ -184,8 +194,12 @@ fun OutingMapScreen(
                             name = values.name,
                         )
                         showCapture = false
+                        longPressPoint = null
                     },
-                    onDismiss = { showCapture = false },
+                    onDismiss = {
+                        showCapture = false
+                        longPressPoint = null
+                    },
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             } else editTarget?.let { reading ->

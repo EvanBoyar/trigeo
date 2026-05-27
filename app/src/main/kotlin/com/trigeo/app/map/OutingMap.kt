@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -78,11 +79,13 @@ fun OutingMap(
     liveBidirectional: Boolean,
     tileStyle: MapTileStyle,
     fix: TriangulationFix?,
+    onLongPress: (GeoPoint) -> Unit,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentLongPress by rememberUpdatedState(onLongPress)
 
     var styleRef by remember { mutableStateOf<Style?>(null) }
     var mapRef by remember { mutableStateOf<MapLibreMap?>(null) }
@@ -96,6 +99,10 @@ fun OutingMap(
                     .target(LatLng(20.0, 0.0))
                     .zoom(1.5)
                     .build()
+                map.addOnMapLongClickListener { p ->
+                    currentLongPress(GeoPoint(p.latitude, p.longitude))
+                    true
+                }
             }
         }
     }
