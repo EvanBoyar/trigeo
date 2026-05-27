@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -116,10 +119,19 @@ fun OutingMapScreen(
                         else
                             androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                     ) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(com.trigeo.app.R.drawable.ic_x_marks_spot),
-                            contentDescription = if (showFix) "Hide fix" else "Show fix",
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Map,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp),
+                            )
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = if (showFix) "Hide fix" else "Show fix",
+                                tint = androidx.compose.ui.graphics.Color(0xFFE53935),
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
                     }
                     SmallFloatingActionButton(onClick = { showLayers = true }) {
                         Icon(Icons.Filled.Layers, contentDescription = "Map style")
