@@ -78,7 +78,19 @@ fun OutingsListScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Trigeo") },
+                title = {
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        Text("Trigeo")
+                        Text(
+                            "  by NR8E",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 3.dp),
+                        )
+                    }
+                },
                 navigationIcon = {
                     Image(
                         painter = painterResource(R.drawable.ic_launcher_foreground),

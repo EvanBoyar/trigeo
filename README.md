@@ -1,8 +1,10 @@
 # Trigeo
 
-A pocket triangulation tool for amateur radio operators on transmitter hunts. Take a point and a bearing, and Trigeo draws the cone on a map. Take a few of them and it computes the intersection so you can drive toward where the fox most likely is, without paper or a separate compass.
+A pocket triangulation tool for amateur radio operators on transmitter hunts by Evan Boyar, [NR8E](https://www.qrz.com/db/NR8E). Take a point and a bearing, and Trigeo draws the cone on a map. Take a few of them and it computes the intersection so you can head toward where the transmitter most likely is, without paper or a separate compass.
 
-Everything runs locally on the phone. No accounts, no cloud, no telemetry.
+Everything runs locally on your phone.
+
+[If you like, you can thank me with a small donation!](https://buymeacoffee.com/elbow)
 
 ## The flow
 
@@ -63,7 +65,7 @@ The fine print: OpenStreetMap and OpenTopoMap public tile servers ask that you d
 ## Coordinates and precision
 
 - Bearings are stored as true north, with the local magnetic declination from the World Magnetic Model applied at the reading's location.
-- Coordinates display at 6 decimal places (~10 cm precision). The triangulation math projects into a local east-north meter frame around the centroid, so it's accurate over the kilometers-scale areas typical of fox hunts.
+- Coordinates display at 6 decimal places (~10 cm precision). The triangulation math projects into a local east-north meter frame around the centroid, so it's accurate over the kilometers-scale areas typical of transmitter hunts.
 - The fix's error ellipse is 2-sigma derived from the covariance of the weighted normal equations. Weights are `1 / halfWidth^2`, clamped at 0.5 degrees, so a sharp reading pulls harder than a loose one.
 - Bearings are treated as lines, not rays. A fix can land behind a non-bidirectional reading if the geometry says so, which is usually a hint that someone aimed at the back null.
 
