@@ -9,6 +9,7 @@ data class Reading(
     val name: String?,
     val point: GeoPoint,
     val bearing: BearingCapture,
+    val bidirectional: Boolean,
     val visible: Boolean,
     val createdAt: Instant,
 ) {

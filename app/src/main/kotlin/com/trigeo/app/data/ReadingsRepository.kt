@@ -22,6 +22,7 @@ class ReadingsRepository(
         outingId: UUID,
         point: GeoPoint,
         bearing: BearingCapture,
+        bidirectional: Boolean,
         name: String? = null,
     ): Reading {
         val reading = Reading(
@@ -30,6 +31,7 @@ class ReadingsRepository(
             name = name?.takeIf { it.isNotBlank() },
             point = point,
             bearing = bearing,
+            bidirectional = bidirectional,
             visible = true,
             createdAt = clock.instant(),
         )

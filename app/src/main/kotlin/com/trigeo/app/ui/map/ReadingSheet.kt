@@ -33,6 +33,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,6 +66,7 @@ data class ReadingDraft(
     val startBearingDeg: Double? = null,
     val stopBearingDeg: Double? = null,
     val uncertaintyDeg: Float = Defaults.UNCERTAINTY_DEG.toFloat(),
+    val bidirectional: Boolean = false,
 )
 
 private fun ReadingDraft.bearingFromCompass(liveCompass: CompassReading?): BearingCapture? {
@@ -83,10 +85,17 @@ private fun ReadingDraft.bearingFromCustom(): BearingCapture? {
     return BearingCapture.fromCenter(center, uncertaintyDeg.toDouble())
 }
 
+data class DraftValues(
+    val point: GeoPoint?,
+    val bearing: BearingCapture?,
+    val name: String?,
+    val bidirectional: Boolean,
+)
+
 fun ReadingDraft.toReadingValues(
     liveLocation: Location?,
     liveCompass: CompassReading?,
-): Triple<GeoPoint?, BearingCapture?, String?> {
+): DraftValues {
     val point: GeoPoint? = if (useGps) {
         liveLocation?.let { GeoPoint(it.latitude, it.longitude) }
     } else {
@@ -101,7 +110,12 @@ fun ReadingDraft.toReadingValues(
         BearingMode.START_STOP -> bearingFromStartStop()
         BearingMode.CUSTOM -> bearingFromCustom()
     }
-    return Triple(point, bearing, name.trim().ifBlank { null })
+    return DraftValues(
+        point = point,
+        bearing = bearing,
+        name = name.trim().ifBlank { null },
+        bidirectional = bidirectional,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +127,7 @@ fun ReadingPanel(
     onRequestPermission: () -> Unit,
     liveLocation: Location?,
     liveCompass: CompassReading?,
-    onSave: (GeoPoint, BearingCapture, String?) -> Unit,
+    onSave: (DraftValues) -> Unit,
     onDelete: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -158,6 +172,11 @@ fun ReadingPanel(
                 )
             }
 
+            BidirectionalCard(
+                checked = draft.bidirectional,
+                onChange = { draft = draft.copy(bidirectional = it) },
+            )
+
             OutlinedTextField(
                 value = draft.name,
                 onValueChange = { draft = draft.copy(name = it) },
@@ -166,8 +185,8 @@ fun ReadingPanel(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            val (point, bearing, name) = draft.toReadingValues(liveLocation, liveCompass)
-            val canSave = point != null && bearing != null
+            val values = draft.toReadingValues(liveLocation, liveCompass)
+            val canSave = values.point != null && values.bearing != null
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -180,7 +199,7 @@ fun ReadingPanel(
                 TextButton(onClick = onDismiss) { Text("Cancel") }
                 Button(
                     enabled = canSave,
-                    onClick = { onSave(point!!, bearing!!, name) },
+                    onClick = { onSave(values) },
                 ) { Text(if (onDelete != null) "Save" else "Add reading") }
             }
             Spacer(Modifier.height(8.dp))
@@ -401,6 +420,31 @@ private fun OrientationHint(orientation: PhoneOrientation) {
         label = { Text(label) },
         colors = AssistChipDefaults.elevatedAssistChipColors(),
     )
+}
+
+@Composable
+private fun BidirectionalCard(
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Bidirectional", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Draw the bearing through both directions. Use this for null-based antennas where the signal could be in front or behind.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = checked, onCheckedChange = onChange)
+        }
+    }
 }
 
 @Composable

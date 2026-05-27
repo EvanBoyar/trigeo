@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
+import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
@@ -25,6 +26,7 @@ import java.util.UUID
 class OutingMapViewModel(
     private val outingsRepo: OutingsRepository,
     private val readingsRepo: ReadingsRepository,
+    private val settingsRepo: SettingsRepository,
     private val locationService: LocationService,
     private val compassService: CompassService,
     private val outingId: UUID,
@@ -35,6 +37,9 @@ class OutingMapViewModel(
 
     val readings: StateFlow<List<Reading>> = readingsRepo.observeByOuting(outingId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val defaultBidirectional: StateFlow<Boolean> = settingsRepo.defaultBidirectional
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _liveLocation = MutableStateFlow<Location?>(null)
     val liveLocation: StateFlow<Location?> = _liveLocation.asStateFlow()
@@ -76,8 +81,15 @@ class OutingMapViewModel(
         super.onCleared()
     }
 
-    fun createReading(point: GeoPoint, bearing: BearingCapture, name: String?) {
-        viewModelScope.launch { readingsRepo.create(outingId, point, bearing, name) }
+    fun createReading(
+        point: GeoPoint,
+        bearing: BearingCapture,
+        bidirectional: Boolean,
+        name: String?,
+    ) {
+        viewModelScope.launch {
+            readingsRepo.create(outingId, point, bearing, bidirectional, name)
+        }
     }
 
     fun updateReading(reading: Reading) {
@@ -96,6 +108,7 @@ class OutingMapViewModel(
         fun factory(
             outingsRepo: OutingsRepository,
             readingsRepo: ReadingsRepository,
+            settingsRepo: SettingsRepository,
             locationService: LocationService,
             compassService: CompassService,
             outingId: UUID,
@@ -103,7 +116,8 @@ class OutingMapViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 OutingMapViewModel(
-                    outingsRepo, readingsRepo, locationService, compassService, outingId,
+                    outingsRepo, readingsRepo, settingsRepo,
+                    locationService, compassService, outingId,
                 ) as T
         }
     }

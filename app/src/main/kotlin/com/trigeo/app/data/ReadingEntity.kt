@@ -30,6 +30,7 @@ data class ReadingEntity(
     val longitude: Double,
     val bearingCenterDeg: Double,
     val bearingHalfWidthDeg: Double,
+    val bidirectional: Boolean,
     val visible: Boolean,
     val createdAtEpochMs: Long,
 ) {
@@ -39,6 +40,7 @@ data class ReadingEntity(
         name = name,
         point = GeoPoint(latitude, longitude),
         bearing = BearingCapture(bearingCenterDeg, bearingHalfWidthDeg),
+        bidirectional = bidirectional,
         visible = visible,
         createdAt = Instant.ofEpochMilli(createdAtEpochMs),
     )
@@ -52,6 +54,7 @@ data class ReadingEntity(
             longitude = reading.point.longitude,
             bearingCenterDeg = reading.bearing.centerDeg,
             bearingHalfWidthDeg = reading.bearing.halfWidthDeg,
+            bidirectional = reading.bidirectional,
             visible = reading.visible,
             createdAtEpochMs = reading.createdAt.toEpochMilli(),
         )

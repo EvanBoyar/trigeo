@@ -43,6 +43,7 @@ fun OutingMapScreen(
     val readings by viewModel.readings.collectAsState()
     val liveLocation by viewModel.liveLocation.collectAsState()
     val liveCompass by viewModel.liveCompass.collectAsState()
+    val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
 
     val permission = rememberLocationPermission()
 
@@ -105,13 +106,18 @@ fun OutingMapScreen(
             if (showCapture) {
                 ReadingPanel(
                     title = "Add reading",
-                    initial = ReadingDraft(),
+                    initial = ReadingDraft(bidirectional = defaultBidirectional),
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
                     liveLocation = liveLocation,
                     liveCompass = liveCompass,
-                    onSave = { point, bearing, name ->
-                        viewModel.createReading(point, bearing, name)
+                    onSave = { values ->
+                        viewModel.createReading(
+                            point = values.point!!,
+                            bearing = values.bearing!!,
+                            bidirectional = values.bidirectional,
+                            name = values.name,
+                        )
                         showCapture = false
                     },
                     onDismiss = { showCapture = false },
@@ -128,14 +134,20 @@ fun OutingMapScreen(
                         bearingMode = BearingMode.CUSTOM,
                         manualBearingDeg = "%.1f".format(reading.bearing.centerDeg),
                         uncertaintyDeg = reading.bearing.uncertaintyDeg.toFloat(),
+                        bidirectional = reading.bidirectional,
                     ),
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
                     liveLocation = liveLocation,
                     liveCompass = liveCompass,
-                    onSave = { point, bearing, name ->
+                    onSave = { values ->
                         viewModel.updateReading(
-                            reading.copy(point = point, bearing = bearing, name = name),
+                            reading.copy(
+                                point = values.point!!,
+                                bearing = values.bearing!!,
+                                bidirectional = values.bidirectional,
+                                name = values.name,
+                            ),
                         )
                         editTarget = null
                     },

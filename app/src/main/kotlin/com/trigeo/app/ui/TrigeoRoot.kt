@@ -11,6 +11,8 @@ import com.trigeo.app.ui.outings.OutingsListScreen
 import com.trigeo.app.ui.outings.OutingsViewModel
 import com.trigeo.app.ui.map.OutingMapScreen
 import com.trigeo.app.ui.map.OutingMapViewModel
+import com.trigeo.app.ui.settings.SettingsScreen
+import com.trigeo.app.ui.settings.SettingsViewModel
 import java.util.UUID
 
 @Composable
@@ -23,6 +25,7 @@ fun TrigeoRoot() {
             OutingsListScreen(
                 viewModel = vm,
                 onOpen = { outing -> nav.navigate("outing/${outing.id}") },
+                onOpenSettings = { nav.navigate("settings") },
             )
         }
         composable("outing/{outingId}") { backStack ->
@@ -36,12 +39,17 @@ fun TrigeoRoot() {
                 factory = OutingMapViewModel.factory(
                     outingsRepo = app.outingsRepository,
                     readingsRepo = app.readingsRepository,
+                    settingsRepo = app.settingsRepository,
                     locationService = app.locationService,
                     compassService = app.compassService,
                     outingId = outingId,
                 ),
             )
             OutingMapScreen(viewModel = vm, onBack = { nav.popBackStack() })
+        }
+        composable("settings") {
+            val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app.settingsRepository))
+            SettingsScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
     }
 }
