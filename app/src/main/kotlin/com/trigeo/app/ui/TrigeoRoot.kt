@@ -11,6 +11,7 @@ import com.trigeo.app.ui.outings.OutingsListScreen
 import com.trigeo.app.ui.outings.OutingsViewModel
 import com.trigeo.app.ui.map.OutingMapScreen
 import com.trigeo.app.ui.map.OutingMapViewModel
+import com.trigeo.app.ui.help.HelpScreen
 import com.trigeo.app.ui.offline.OfflinePickerScreen
 import com.trigeo.app.ui.offline.OfflinePickerViewModel
 import com.trigeo.app.ui.settings.SettingsScreen
@@ -34,7 +35,11 @@ fun TrigeoRoot() {
                 viewModel = vm,
                 onOpen = { outing -> nav.navigate("outing/${outing.id}") },
                 onOpenSettings = { nav.navigate("settings") },
+                onOpenHelp = { nav.navigate("help") },
             )
+        }
+        composable("help") {
+            HelpScreen(onBack = { nav.popBackStack() })
         }
         composable("outing/{outingId}") { backStack ->
             val raw = backStack.arguments?.getString("outingId").orEmpty()

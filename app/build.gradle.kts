@@ -6,6 +6,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val syncManualToAssets by tasks.registering(Copy::class) {
+    from(rootProject.layout.projectDirectory.file("README.md"))
+    into(layout.buildDirectory.dir("generated/manual-assets"))
+    rename { "manual.md" }
+}
+
 android {
     namespace = "com.trigeo.app"
     compileSdk = 36
@@ -47,6 +53,12 @@ android {
         buildConfig = true
     }
 
+    sourceSets {
+        getByName("main") {
+            assets.srcDir(layout.buildDirectory.dir("generated/manual-assets"))
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -54,6 +66,12 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+}
+
+tasks.configureEach {
+    if (name.matches(Regex("merge.*Assets|generate.*Assets|package.*Assets"))) {
+        dependsOn(syncManualToAssets)
     }
 }
 
@@ -78,6 +96,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.markdown.renderer.m3)
 
     implementation(libs.maplibre.android)
     implementation(libs.play.services.location)

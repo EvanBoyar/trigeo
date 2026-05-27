@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Favorite
@@ -61,6 +62,7 @@ fun OutingsListScreen(
     viewModel: OutingsViewModel,
     onOpen: (Outing) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHelp: () -> Unit,
 ) {
     val context = LocalContext.current
     val outings by viewModel.outings.collectAsState()
@@ -87,6 +89,12 @@ fun OutingsListScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onOpenHelp) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = "Help",
+                        )
+                    }
                     IconButton(onClick = { showImport = true }) {
                         Icon(Icons.Filled.ContentPaste, contentDescription = "Import outing")
                     }
