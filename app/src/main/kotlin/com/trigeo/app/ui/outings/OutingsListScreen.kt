@@ -1,0 +1,235 @@
+package com.trigeo.app.ui.outings
+
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.trigeo.app.domain.Outing
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OutingsListScreen(
+    viewModel: OutingsViewModel,
+    onOpen: (Outing) -> Unit,
+) {
+    val outings by viewModel.outings.collectAsState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showCreate by remember { mutableStateOf(false) }
+    var manageTarget by remember { mutableStateOf<Outing?>(null) }
+    var renameTarget by remember { mutableStateOf<Outing?>(null) }
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Outings") },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showCreate = true },
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text("New outing") },
+            )
+        },
+    ) { padding ->
+        if (outings.isEmpty()) {
+            EmptyState(padding)
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = padding.calculateTopPadding() + 8.dp,
+                    bottom = padding.calculateBottomPadding() + 96.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(items = outings, key = { it.id }) { outing ->
+                    OutingRow(
+                        outing = outing,
+                        onClick = { onOpen(outing) },
+                        onLongPress = { manageTarget = outing },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCreate) {
+        OutingNameDialog(
+            title = "New outing",
+            confirmLabel = "Create",
+            initial = "",
+            onConfirm = { name ->
+                showCreate = false
+                viewModel.create(name) { created -> onOpen(created) }
+            },
+            onDismiss = { showCreate = false },
+        )
+    }
+
+    renameTarget?.let { target ->
+        OutingNameDialog(
+            title = "Rename outing",
+            confirmLabel = "Save",
+            initial = target.name.orEmpty(),
+            onConfirm = { name ->
+                viewModel.rename(target.id, name)
+                renameTarget = null
+            },
+            onDismiss = { renameTarget = null },
+        )
+    }
+
+    manageTarget?.let { target ->
+        ManageOutingSheet(
+            outing = target,
+            onDismiss = { manageTarget = null },
+            onRename = {
+                manageTarget = null
+                renameTarget = target
+            },
+            onDelete = {
+                viewModel.delete(target.id)
+                manageTarget = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun EmptyState(padding: PaddingValues) {
+    Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "No outings yet",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Tap New outing to start a hunt.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OutingRow(
+    outing: Outing,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val formatter = remember {
+        DateTimeFormatter.ofPattern("MMM d, yyyy  h:mm a").withZone(ZoneId.systemDefault())
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Text(
+                outing.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                formatter.format(outing.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManageOutingSheet(
+    outing: Outing,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+            Text(
+                outing.displayName,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider()
+            SheetAction(label = "Rename", onClick = onRename)
+            SheetAction(label = "Delete", destructive = true, onClick = onDelete)
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SheetAction(
+    label: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick)
+            .padding(vertical = 16.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = color)
+    }
+}

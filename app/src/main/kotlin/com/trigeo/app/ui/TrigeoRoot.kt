@@ -1,27 +1,41 @@
 package com.trigeo.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.trigeo.app.TrigeoApp
+import com.trigeo.app.ui.outings.OutingsListScreen
+import com.trigeo.app.ui.outings.OutingsViewModel
+import com.trigeo.app.ui.map.OutingMapScreen
+import com.trigeo.app.ui.map.OutingMapViewModel
+import java.util.UUID
 
 @Composable
 fun TrigeoRoot() {
-    Scaffold { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text("Trigeo")
-            Text("Map view goes here")
+    val nav = rememberNavController()
+    val app = LocalContext.current.applicationContext as TrigeoApp
+    NavHost(navController = nav, startDestination = "outings") {
+        composable("outings") {
+            val vm: OutingsViewModel = viewModel(factory = OutingsViewModel.factory(app.outingsRepository))
+            OutingsListScreen(
+                viewModel = vm,
+                onOpen = { outing -> nav.navigate("outing/${outing.id}") },
+            )
+        }
+        composable("outing/{outingId}") { backStack ->
+            val raw = backStack.arguments?.getString("outingId").orEmpty()
+            val outingId = runCatching { UUID.fromString(raw) }.getOrNull()
+            if (outingId == null) {
+                nav.popBackStack()
+                return@composable
+            }
+            val vm: OutingMapViewModel = viewModel(
+                factory = OutingMapViewModel.factory(app.outingsRepository, outingId),
+            )
+            OutingMapScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
     }
 }
