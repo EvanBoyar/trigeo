@@ -6,6 +6,7 @@ import com.trigeo.app.domain.Reading
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 class ReadingsRepository(
@@ -41,6 +42,28 @@ class ReadingsRepository(
 
     suspend fun update(reading: Reading) {
         dao.upsert(ReadingEntity.fromDomain(reading))
+    }
+
+    suspend fun insertImported(
+        outingId: UUID,
+        name: String?,
+        point: GeoPoint,
+        bearing: BearingCapture,
+        bidirectional: Boolean,
+        createdAt: Instant,
+    ): Reading {
+        val reading = Reading(
+            id = idFactory(),
+            outingId = outingId,
+            name = name?.takeIf { it.isNotBlank() },
+            point = point,
+            bearing = bearing,
+            bidirectional = bidirectional,
+            visible = true,
+            createdAt = createdAt,
+        )
+        dao.upsert(ReadingEntity.fromDomain(reading))
+        return reading
     }
 
     suspend fun setVisible(id: UUID, visible: Boolean) {

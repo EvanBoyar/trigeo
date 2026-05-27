@@ -21,7 +21,9 @@ fun TrigeoRoot() {
     val app = LocalContext.current.applicationContext as TrigeoApp
     NavHost(navController = nav, startDestination = "outings") {
         composable("outings") {
-            val vm: OutingsViewModel = viewModel(factory = OutingsViewModel.factory(app.outingsRepository))
+            val vm: OutingsViewModel = viewModel(
+                factory = OutingsViewModel.factory(app.outingsRepository, app.readingsRepository),
+            )
             OutingsListScreen(
                 viewModel = vm,
                 onOpen = { outing -> nav.navigate("outing/${outing.id}") },

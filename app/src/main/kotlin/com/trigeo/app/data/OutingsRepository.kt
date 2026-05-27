@@ -4,6 +4,7 @@ import com.trigeo.app.domain.Outing
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 class OutingsRepository(
@@ -16,11 +17,11 @@ class OutingsRepository(
 
     suspend fun get(id: UUID): Outing? = dao.findById(id.toString())?.toDomain()
 
-    suspend fun create(name: String? = null): Outing {
+    suspend fun create(name: String? = null, createdAt: Instant = clock.instant()): Outing {
         val outing = Outing(
             id = idFactory(),
             name = name?.takeIf { it.isNotBlank() },
-            createdAt = clock.instant(),
+            createdAt = createdAt,
         )
         dao.upsert(OutingEntity.fromDomain(outing))
         return outing

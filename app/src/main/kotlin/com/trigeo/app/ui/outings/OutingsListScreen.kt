@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.Outing
@@ -52,11 +55,14 @@ fun OutingsListScreen(
     onOpen: (Outing) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val context = LocalContext.current
     val outings by viewModel.outings.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showCreate by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
     var manageTarget by remember { mutableStateOf<Outing?>(null) }
     var renameTarget by remember { mutableStateOf<Outing?>(null) }
+    var importError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -64,6 +70,9 @@ fun OutingsListScreen(
             LargeTopAppBar(
                 title = { Text("Outings") },
                 actions = {
+                    IconButton(onClick = { showImport = true }) {
+                        Icon(Icons.Filled.ContentPaste, contentDescription = "Import outing")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
@@ -137,9 +146,54 @@ fun OutingsListScreen(
                 manageTarget = null
                 renameTarget = target
             },
+            onShare = {
+                manageTarget = null
+                viewModel.shareText(target.id) { text ->
+                    val title = target.displayName
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Trigeo outing: $title")
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "Trigeo outing \"$title\". Paste this into Trigeo to import:\n\n$text",
+                        )
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share outing"))
+                }
+            },
             onDelete = {
                 viewModel.delete(target.id)
                 manageTarget = null
+            },
+        )
+    }
+
+    if (showImport) {
+        ImportOutingDialog(
+            onImport = { text ->
+                viewModel.import(text) { result ->
+                    result.fold(
+                        onSuccess = { outing ->
+                            showImport = false
+                            onOpen(outing)
+                        },
+                        onFailure = { e ->
+                            importError = e.message ?: "Couldn't import"
+                        },
+                    )
+                }
+            },
+            onDismiss = { showImport = false },
+        )
+    }
+
+    importError?.let { msg ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { importError = null },
+            title = { Text("Import failed") },
+            text = { Text(msg) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { importError = null }) { Text("OK") }
             },
         )
     }
@@ -205,6 +259,7 @@ private fun ManageOutingSheet(
     outing: Outing,
     onDismiss: () -> Unit,
     onRename: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -218,6 +273,7 @@ private fun ManageOutingSheet(
             Spacer(Modifier.height(12.dp))
             HorizontalDivider()
             SheetAction(label = "Rename", onClick = onRename)
+            SheetAction(label = "Share", onClick = onShare)
             SheetAction(label = "Delete", destructive = true, onClick = onDelete)
             Spacer(Modifier.height(8.dp))
         }
