@@ -36,6 +36,8 @@ class TriangulationTest {
         name = null,
         point = GeoPoint(lat, lon),
         bearing = BearingCapture(Angles.normalize(bearingDeg), halfWidthDeg),
+        startBearingDeg = null,
+        stopBearingDeg = null,
         bidirectional = false,
         visible = true,
         createdAt = Instant.EPOCH,

@@ -74,6 +74,8 @@ class OutingsViewModel(
                     name = r.name,
                     point = r.point,
                     bearing = r.bearing,
+                    startBearingDeg = r.startBearingDeg,
+                    stopBearingDeg = r.stopBearingDeg,
                     bidirectional = r.bidirectional,
                     createdAt = r.createdAt,
                 )

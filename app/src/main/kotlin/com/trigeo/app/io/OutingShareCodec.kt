@@ -64,6 +64,8 @@ object OutingShareCodec {
         lon = point.longitude,
         bearingDeg = bearing.centerDeg,
         halfWidthDeg = bearing.halfWidthDeg,
+        startBearingDeg = startBearingDeg,
+        stopBearingDeg = stopBearingDeg,
         bidirectional = if (bidirectional) 1 else 0,
         createdAt = createdAt.toEpochMilli(),
     )
@@ -109,6 +111,8 @@ object OutingShareCodec {
         @SerialName("lo") val lon: Double,
         @SerialName("b") val bearingDeg: Double,
         @SerialName("h") val halfWidthDeg: Double,
+        @SerialName("bs") val startBearingDeg: Double? = null,
+        @SerialName("be") val stopBearingDeg: Double? = null,
         @SerialName("d") val bidirectional: Int = 0,
         @SerialName("t") val createdAt: Long,
     ) {
@@ -117,6 +121,8 @@ object OutingShareCodec {
             name = name,
             point = GeoPoint(lat, lon),
             bearing = BearingCapture(bearingDeg.coerceIn(0.0, 360.0), halfWidthDeg.coerceIn(0.0, 180.0)),
+            startBearingDeg = startBearingDeg,
+            stopBearingDeg = stopBearingDeg,
             bidirectional = bidirectional != 0,
             createdAt = Instant.ofEpochMilli(createdAt),
         )
@@ -135,6 +141,8 @@ data class ReadingShare(
     val name: String?,
     val point: GeoPoint,
     val bearing: BearingCapture,
+    val startBearingDeg: Double?,
+    val stopBearingDeg: Double?,
     val bidirectional: Boolean,
     val createdAt: Instant,
 )

@@ -237,6 +237,8 @@ fun OutingMapScreen(
                         viewModel.createReading(
                             point = values.point!!,
                             bearing = values.bearing!!,
+                            startBearingDeg = values.startBearingDeg,
+                            stopBearingDeg = values.stopBearingDeg,
                             bidirectional = values.bidirectional,
                             name = values.name,
                         )
@@ -250,6 +252,7 @@ fun OutingMapScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
             } else editTarget?.let { reading ->
+                val hasStartStop = reading.startBearingDeg != null && reading.stopBearingDeg != null
                 ReadingPanel(
                     title = "Edit reading",
                     initial = ReadingDraft(
@@ -257,8 +260,10 @@ fun OutingMapScreen(
                         useGps = false,
                         manualLat = "%.6f".format(reading.point.latitude),
                         manualLon = "%.6f".format(reading.point.longitude),
-                        bearingMode = BearingMode.CUSTOM,
+                        bearingMode = if (hasStartStop) BearingMode.START_STOP else BearingMode.CUSTOM,
                         manualBearingDeg = "%.1f".format(reading.bearing.centerDeg),
+                        startBearingText = reading.startBearingDeg?.let { "%.1f".format(it) }.orEmpty(),
+                        stopBearingText = reading.stopBearingDeg?.let { "%.1f".format(it) }.orEmpty(),
                         uncertaintyDeg = reading.bearing.uncertaintyDeg.toFloat(),
                         bidirectional = reading.bidirectional,
                     ),
@@ -271,6 +276,8 @@ fun OutingMapScreen(
                             reading.copy(
                                 point = values.point!!,
                                 bearing = values.bearing!!,
+                                startBearingDeg = values.startBearingDeg,
+                                stopBearingDeg = values.stopBearingDeg,
                                 bidirectional = values.bidirectional,
                                 name = values.name,
                             ),

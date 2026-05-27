@@ -56,8 +56,8 @@ data class ReadingDraft(
     val manualLon: String = "",
     val bearingMode: BearingMode = BearingMode.COMPASS,
     val manualBearingDeg: String = "",
-    val startBearingDeg: Double? = null,
-    val stopBearingDeg: Double? = null,
+    val startBearingText: String = "",
+    val stopBearingText: String = "",
     val uncertaintyDeg: Float = Defaults.UNCERTAINTY_DEG.toFloat(),
     val bidirectional: Boolean = false,
 )
@@ -68,8 +68,8 @@ private fun ReadingDraft.bearingFromCompass(liveCompass: CompassReading?): Beari
 }
 
 private fun ReadingDraft.bearingFromStartStop(): BearingCapture? {
-    val s = startBearingDeg ?: return null
-    val e = stopBearingDeg ?: return null
+    val s = startBearingText.toDoubleOrNull() ?: return null
+    val e = stopBearingText.toDoubleOrNull() ?: return null
     return BearingCapture.fromStartStop(s, e)
 }
 
@@ -83,6 +83,8 @@ data class DraftValues(
     val bearing: BearingCapture?,
     val name: String?,
     val bidirectional: Boolean,
+    val startBearingDeg: Double?,
+    val stopBearingDeg: Double?,
 )
 
 fun ReadingDraft.toReadingValues(
@@ -103,11 +105,18 @@ fun ReadingDraft.toReadingValues(
         BearingMode.START_STOP -> bearingFromStartStop()
         BearingMode.CUSTOM -> bearingFromCustom()
     }
+    val (savedStart, savedStop) = if (bearingMode == BearingMode.START_STOP) {
+        Pair(startBearingText.toDoubleOrNull(), stopBearingText.toDoubleOrNull())
+    } else {
+        Pair(null, null)
+    }
     return DraftValues(
         point = point,
         bearing = bearing,
         name = name.trim().ifBlank { null },
         bidirectional = bidirectional,
+        startBearingDeg = savedStart,
+        stopBearingDeg = savedStop,
     )
 }
 
@@ -400,9 +409,11 @@ private fun StartStopCapture(
     liveCompass: CompassReading?,
     onChange: (ReadingDraft) -> Unit,
 ) {
+    val startVal = draft.startBearingText.toDoubleOrNull()
+    val stopVal = draft.stopBearingText.toDoubleOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            "Sweep through the signal. Mark the heading where you first hear it, then where it fades.",
+            "Sweep through the signal. Mark the heading where you first hear it, then where it fades. You can also type values directly.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -419,44 +430,57 @@ private fun StartStopCapture(
         if (liveCompass != null && liveCompass.accuracy.needsCalibration) {
             CalibrationHint()
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(
-                onClick = { onChange(draft.copy(startBearingDeg = liveCompass?.trueDeg)) },
-                enabled = liveCompass != null,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(if (draft.startBearingDeg == null) "Mark start" else "Re-mark start")
-            }
-            FilledTonalButton(
-                onClick = { onChange(draft.copy(stopBearingDeg = liveCompass?.trueDeg)) },
-                enabled = liveCompass != null && draft.startBearingDeg != null,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Mark stop")
-            }
+        StartStopField(
+            label = "Start",
+            value = draft.startBearingText,
+            onValueChange = { onChange(draft.copy(startBearingText = it)) },
+            onMarkFromCompass = liveCompass?.let { c ->
+                { onChange(draft.copy(startBearingText = "%.1f".format(c.trueDeg))) }
+            },
+        )
+        StartStopField(
+            label = "Stop",
+            value = draft.stopBearingText,
+            onValueChange = { onChange(draft.copy(stopBearingText = it)) },
+            onMarkFromCompass = liveCompass?.let { c ->
+                { onChange(draft.copy(stopBearingText = "%.1f".format(c.trueDeg))) }
+            },
+        )
+        if (startVal != null && stopVal != null) {
+            val r = Angles.bisector(startVal, stopVal)
+            Text(
+                "Bisector: %.1f° ± %.1f°".format(r.centerDeg, r.halfWidthDeg),
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
+            )
         }
-        if (draft.startBearingDeg != null || draft.stopBearingDeg != null) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                draft.startBearingDeg?.let {
-                    Text("Start: %.1f°".format(it), fontFamily = FontFamily.Monospace)
-                }
-                draft.stopBearingDeg?.let {
-                    Text("Stop:  %.1f°".format(it), fontFamily = FontFamily.Monospace)
-                }
-                if (draft.startBearingDeg != null && draft.stopBearingDeg != null) {
-                    val r = Angles.bisector(draft.startBearingDeg, draft.stopBearingDeg)
-                    Text(
-                        "Bisector: %.1f° ± %.1f°".format(r.centerDeg, r.halfWidthDeg),
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-            }
-            TextButton(onClick = {
-                onChange(draft.copy(startBearingDeg = null, stopBearingDeg = null))
-            }) { Text("Reset start/stop") }
-        }
+    }
+}
+
+@Composable
+private fun StartStopField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onMarkFromCompass: (() -> Unit)?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier.weight(1f),
+        )
+        FilledTonalButton(
+            onClick = { onMarkFromCompass?.invoke() },
+            enabled = onMarkFromCompass != null,
+        ) { Text("Mark") }
     }
 }
 

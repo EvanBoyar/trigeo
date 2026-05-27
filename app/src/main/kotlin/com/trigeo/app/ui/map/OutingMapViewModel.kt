@@ -100,11 +100,21 @@ class OutingMapViewModel(
     fun createReading(
         point: GeoPoint,
         bearing: BearingCapture,
+        startBearingDeg: Double?,
+        stopBearingDeg: Double?,
         bidirectional: Boolean,
         name: String?,
     ) {
         viewModelScope.launch {
-            readingsRepo.create(outingId, point, bearing, bidirectional, name)
+            readingsRepo.create(
+                outingId = outingId,
+                point = point,
+                bearing = bearing,
+                startBearingDeg = startBearingDeg,
+                stopBearingDeg = stopBearingDeg,
+                bidirectional = bidirectional,
+                name = name,
+            )
         }
     }
 
