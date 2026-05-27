@@ -72,10 +72,12 @@ private const val LYR_PENDING = "trigeo-pending-point-lyr"
 
 private const val ELLIPSE_SIGMA = 2.0
 
+data class CameraRequest(val point: GeoPoint, val token: Long = System.nanoTime())
+
 @Composable
 fun OutingMap(
     readings: List<Reading>,
-    cameraTarget: GeoPoint?,
+    cameraRequest: CameraRequest?,
     liveLocation: GeoPoint?,
     liveBearingDeg: Double?,
     liveUncertaintyDeg: Double,
@@ -83,6 +85,8 @@ fun OutingMap(
     tileStyle: MapTileStyle,
     fix: TriangulationFix?,
     pendingPoint: GeoPoint?,
+    bearingDeg: Double,
+    rotationEnabled: Boolean,
     onLongPress: (GeoPoint) -> Unit,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
@@ -159,16 +163,28 @@ fun OutingMap(
         pushPendingData(style, pendingPoint)
     }
 
-    LaunchedEffect(cameraTarget, mapRef) {
+    LaunchedEffect(cameraRequest, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
-        if (cameraTarget != null) {
+        cameraRequest?.let { req ->
             map.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(
-                    LatLng(cameraTarget.latitude, cameraTarget.longitude),
+                    LatLng(req.point.latitude, req.point.longitude),
                     cameraZoom,
                 ),
             )
         }
+    }
+
+    LaunchedEffect(bearingDeg, mapRef) {
+        val map = mapRef ?: return@LaunchedEffect
+        val current = map.cameraPosition
+        val next = CameraPosition.Builder(current).bearing(bearingDeg).build()
+        map.animateCamera(CameraUpdateFactory.newCameraPosition(next), 200)
+    }
+
+    LaunchedEffect(rotationEnabled, mapRef) {
+        val map = mapRef ?: return@LaunchedEffect
+        map.uiSettings.isRotateGesturesEnabled = rotationEnabled
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)

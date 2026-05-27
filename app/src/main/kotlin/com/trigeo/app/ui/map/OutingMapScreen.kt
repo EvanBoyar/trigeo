@@ -17,8 +17,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.geo.Triangulation
+import com.trigeo.app.map.CameraRequest
 import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.map.OutingMap
 import com.trigeo.app.ui.permissions.rememberLocationPermission
@@ -72,12 +75,19 @@ fun OutingMapScreen(
         if (permission.granted) viewModel.startSensors()
     }
 
-    var cameraTarget by remember { mutableStateOf<GeoPoint?>(null) }
+    var cameraRequest by remember { mutableStateOf<CameraRequest?>(null) }
+    var hasAutoCentered by remember { mutableStateOf(false) }
     LaunchedEffect(liveLocation) {
-        if (cameraTarget == null) {
-            liveLocation?.let { cameraTarget = GeoPoint(it.latitude, it.longitude) }
+        if (!hasAutoCentered) {
+            liveLocation?.let {
+                cameraRequest = CameraRequest(GeoPoint(it.latitude, it.longitude))
+                hasAutoCentered = true
+            }
         }
     }
+
+    var lockToCompass by remember { mutableStateOf(false) }
+    val mapBearing = if (lockToCompass) (liveCompass?.trueDeg ?: 0.0) else 0.0
 
     var showCapture by remember { mutableStateOf(false) }
     var longPressPoint by remember { mutableStateOf<GeoPoint?>(null) }
@@ -109,6 +119,32 @@ fun OutingMapScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            liveLocation?.let {
+                                cameraRequest = CameraRequest(GeoPoint(it.latitude, it.longitude))
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Filled.MyLocation, contentDescription = "Recenter on me")
+                    }
+                    SmallFloatingActionButton(
+                        onClick = { lockToCompass = !lockToCompass },
+                        containerColor = if (lockToCompass)
+                            androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        else
+                            androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = if (lockToCompass)
+                            androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                        else
+                            androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Icon(
+                            Icons.Filled.Explore,
+                            contentDescription = if (lockToCompass)
+                                "Lock to compass (on)" else "Lock to compass (off)",
+                        )
+                    }
                     SmallFloatingActionButton(
                         onClick = { showFix = !showFix },
                         containerColor = if (showFix)
@@ -156,7 +192,7 @@ fun OutingMapScreen(
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 OutingMap(
                     readings = readings,
-                    cameraTarget = cameraTarget,
+                    cameraRequest = cameraRequest,
                     liveLocation = liveLocation?.let { GeoPoint(it.latitude, it.longitude) },
                     liveBearingDeg = liveCompass?.trueDeg,
                     liveUncertaintyDeg = defaultUncertaintyDeg.toDouble(),
@@ -164,6 +200,8 @@ fun OutingMapScreen(
                     tileStyle = tileStyle,
                     fix = fix,
                     pendingPoint = if (showCapture) longPressPoint else null,
+                    bearingDeg = mapBearing,
+                    rotationEnabled = !lockToCompass,
                     onLongPress = { point ->
                         if (!panelOpen) {
                             longPressPoint = point
