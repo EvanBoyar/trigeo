@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
@@ -40,6 +42,7 @@ fun OutingMapScreen(
     viewModel: OutingMapViewModel,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val outing by viewModel.outing.collectAsState()
     val readings by viewModel.readings.collectAsState()
     val liveLocation by viewModel.liveLocation.collectAsState()
@@ -159,6 +162,20 @@ fun OutingMapScreen(
                     onDelete = {
                         viewModel.deleteReading(reading.id)
                         editTarget = null
+                    },
+                    onShare = {
+                        viewModel.shareReadingText(reading) { text ->
+                            val title = reading.displayName
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "Trigeo reading: $title")
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "Trigeo reading \"$title\". Paste this into Trigeo to import:\n\n$text",
+                                )
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Share reading"))
+                        }
                     },
                     onDismiss = { editTarget = null },
                     modifier = Modifier.fillMaxWidth().weight(1f),

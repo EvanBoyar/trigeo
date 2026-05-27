@@ -129,6 +129,7 @@ fun ReadingPanel(
     liveCompass: CompassReading?,
     onSave: (DraftValues) -> Unit,
     onDelete: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -189,11 +190,14 @@ fun ReadingPanel(
             val canSave = values.point != null && values.bearing != null
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (onDelete != null) {
                     OutlinedButton(onClick = onDelete) { Text("Delete") }
+                }
+                if (onShare != null) {
+                    OutlinedButton(onClick = onShare) { Text("Share") }
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss) { Text("Cancel") }

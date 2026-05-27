@@ -33,24 +33,40 @@ object OutingShareCodec {
 
     fun encode(outing: Outing, readings: List<Reading>): String {
         val payload = OutingPayload(
+            id = outing.id.toString(),
             name = outing.name,
             createdAt = outing.createdAt.toEpochMilli(),
-            readings = readings.map { r ->
-                ReadingPayload(
-                    name = r.name,
-                    lat = r.point.latitude,
-                    lon = r.point.longitude,
-                    bearingDeg = r.bearing.centerDeg,
-                    halfWidthDeg = r.bearing.halfWidthDeg,
-                    bidirectional = if (r.bidirectional) 1 else 0,
-                    createdAt = r.createdAt.toEpochMilli(),
-                )
-            },
+            readings = readings.map { it.toPayload() },
         )
+        return encode(payload)
+    }
+
+    fun encodeReading(parentOuting: Outing, reading: Reading): String {
+        val payload = OutingPayload(
+            id = parentOuting.id.toString(),
+            name = parentOuting.name,
+            createdAt = parentOuting.createdAt.toEpochMilli(),
+            readings = listOf(reading.toPayload()),
+        )
+        return encode(payload)
+    }
+
+    private fun encode(payload: OutingPayload): String {
         val body = json.encodeToString(OutingPayload.serializer(), payload)
         val b64 = Base64.getUrlEncoder().withoutPadding().encodeToString(body.toByteArray(Charsets.UTF_8))
         return "$PREFIX$b64"
     }
+
+    private fun Reading.toPayload(): ReadingPayload = ReadingPayload(
+        id = id.toString(),
+        name = name,
+        lat = point.latitude,
+        lon = point.longitude,
+        bearingDeg = bearing.centerDeg,
+        halfWidthDeg = bearing.halfWidthDeg,
+        bidirectional = if (bidirectional) 1 else 0,
+        createdAt = createdAt.toEpochMilli(),
+    )
 
     sealed class DecodeError(message: String) : Exception(message) {
         object NoToken : DecodeError("No Trigeo share token found in the text.")
@@ -72,11 +88,13 @@ object OutingShareCodec {
 
     @Serializable
     private data class OutingPayload(
+        @SerialName("i") val id: String? = null,
         @SerialName("n") val name: String? = null,
         @SerialName("t") val createdAt: Long,
         @SerialName("r") val readings: List<ReadingPayload> = emptyList(),
     ) {
         fun toShare(): OutingShare = OutingShare(
+            outingId = id?.let { runCatching { UUID.fromString(it) }.getOrNull() },
             outingName = name,
             outingCreatedAt = Instant.ofEpochMilli(createdAt),
             readings = readings.map { it.toShare() },
@@ -85,6 +103,7 @@ object OutingShareCodec {
 
     @Serializable
     private data class ReadingPayload(
+        @SerialName("i") val id: String? = null,
         @SerialName("n") val name: String? = null,
         @SerialName("la") val lat: Double,
         @SerialName("lo") val lon: Double,
@@ -94,6 +113,7 @@ object OutingShareCodec {
         @SerialName("t") val createdAt: Long,
     ) {
         fun toShare(): ReadingShare = ReadingShare(
+            id = id?.let { runCatching { UUID.fromString(it) }.getOrNull() },
             name = name,
             point = GeoPoint(lat, lon),
             bearing = BearingCapture(bearingDeg.coerceIn(0.0, 360.0), halfWidthDeg.coerceIn(0.0, 180.0)),
@@ -104,12 +124,14 @@ object OutingShareCodec {
 }
 
 data class OutingShare(
+    val outingId: UUID?,
     val outingName: String?,
     val outingCreatedAt: Instant,
     val readings: List<ReadingShare>,
 )
 
 data class ReadingShare(
+    val id: UUID?,
     val name: String?,
     val point: GeoPoint,
     val bearing: BearingCapture,

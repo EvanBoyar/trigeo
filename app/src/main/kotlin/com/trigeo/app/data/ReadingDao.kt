@@ -14,6 +14,9 @@ interface ReadingDao {
     @Query("SELECT * FROM readings WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): ReadingEntity?
 
+    @Query("SELECT EXISTS(SELECT 1 FROM readings WHERE outingId = :outingId AND id = :id)")
+    suspend fun existsInOuting(outingId: String, id: String): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(reading: ReadingEntity)
 

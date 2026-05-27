@@ -168,14 +168,16 @@ fun OutingsListScreen(
         )
     }
 
+    var importSummary by remember { mutableStateOf<OutingsViewModel.ImportSummary?>(null) }
     if (showImport) {
         ImportOutingDialog(
-            onImport = { text ->
-                viewModel.import(text) { result ->
+            existingOutings = outings,
+            onImport = { text, target ->
+                viewModel.import(text, target) { result ->
                     result.fold(
-                        onSuccess = { outing ->
+                        onSuccess = { summary ->
                             showImport = false
-                            onOpen(outing)
+                            importSummary = summary
                         },
                         onFailure = { e ->
                             importError = e.message ?: "Couldn't import"
@@ -194,6 +196,30 @@ fun OutingsListScreen(
             text = { Text(msg) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { importError = null }) { Text("OK") }
+            },
+        )
+    }
+
+    importSummary?.let { summary ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { importSummary = null },
+            title = { Text("Imported") },
+            text = {
+                val parts = buildList {
+                    add("${summary.inserted} reading${if (summary.inserted == 1) "" else "s"} added to \"${summary.outing.displayName}\"")
+                    if (summary.skipped > 0) add("${summary.skipped} duplicate${if (summary.skipped == 1) "" else "s"} skipped")
+                }
+                Text(parts.joinToString(". ") + ".")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val outing = summary.outing
+                    importSummary = null
+                    onOpen(outing)
+                }) { Text("Open") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { importSummary = null }) { Text("Close") }
             },
         )
     }

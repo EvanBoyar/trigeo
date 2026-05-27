@@ -45,24 +45,44 @@ class OutingsViewModel(
         }
     }
 
-    fun import(text: String, onResult: (Result<Outing>) -> Unit) {
+    data class ImportSummary(val outing: Outing, val inserted: Int, val skipped: Int)
+
+    fun import(
+        text: String,
+        targetOutingId: UUID?,
+        onResult: (Result<ImportSummary>) -> Unit,
+    ) {
         viewModelScope.launch {
             val share = OutingShareCodec.decode(text).getOrElse {
                 onResult(Result.failure(it))
                 return@launch
             }
-            val outing = repo.create(name = share.outingName, createdAt = share.outingCreatedAt)
+            val outing = if (targetOutingId != null) {
+                repo.get(targetOutingId) ?: run {
+                    onResult(Result.failure(IllegalStateException("Target outing not found")))
+                    return@launch
+                }
+            } else {
+                repo.create(name = share.outingName, createdAt = share.outingCreatedAt)
+            }
+            var inserted = 0
+            var skipped = 0
             share.readings.forEach { r ->
-                readingsRepo.insertImported(
+                val outcome = readingsRepo.insertImported(
                     outingId = outing.id,
+                    readingId = r.id,
                     name = r.name,
                     point = r.point,
                     bearing = r.bearing,
                     bidirectional = r.bidirectional,
                     createdAt = r.createdAt,
                 )
+                when (outcome) {
+                    is com.trigeo.app.data.ReadingsRepository.InsertOutcome.Inserted -> inserted++
+                    is com.trigeo.app.data.ReadingsRepository.InsertOutcome.Skipped -> skipped++
+                }
             }
-            onResult(Result.success(outing))
+            onResult(Result.success(ImportSummary(outing, inserted, skipped)))
         }
     }
 

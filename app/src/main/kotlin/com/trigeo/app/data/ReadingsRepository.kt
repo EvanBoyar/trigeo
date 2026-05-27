@@ -46,14 +46,19 @@ class ReadingsRepository(
 
     suspend fun insertImported(
         outingId: UUID,
+        readingId: UUID?,
         name: String?,
         point: GeoPoint,
         bearing: BearingCapture,
         bidirectional: Boolean,
         createdAt: Instant,
-    ): Reading {
+    ): InsertOutcome {
+        val id = readingId ?: idFactory()
+        if (readingId != null && dao.existsInOuting(outingId.toString(), id.toString())) {
+            return InsertOutcome.Skipped(id)
+        }
         val reading = Reading(
-            id = idFactory(),
+            id = id,
             outingId = outingId,
             name = name?.takeIf { it.isNotBlank() },
             point = point,
@@ -63,7 +68,12 @@ class ReadingsRepository(
             createdAt = createdAt,
         )
         dao.upsert(ReadingEntity.fromDomain(reading))
-        return reading
+        return InsertOutcome.Inserted(reading)
+    }
+
+    sealed class InsertOutcome {
+        data class Inserted(val reading: Reading) : InsertOutcome()
+        data class Skipped(val readingId: UUID) : InsertOutcome()
     }
 
     suspend fun setVisible(id: UUID, visible: Boolean) {

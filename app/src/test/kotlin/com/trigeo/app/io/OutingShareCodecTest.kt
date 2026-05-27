@@ -48,10 +48,12 @@ class OutingShareCodecTest {
         val text = OutingShareCodec.encode(outing, readings)
         assertTrue("starts with prefix: $text", text.startsWith("trigeo:v1:"))
         val share = OutingShareCodec.decode(text).getOrThrow()
+        assertEquals(outing.id, share.outingId)
         assertEquals(outing.name, share.outingName)
         assertEquals(outing.createdAt, share.outingCreatedAt)
         assertEquals(2, share.readings.size)
         val first = share.readings[0]
+        assertEquals(readings[0].id, first.id)
         assertEquals("Hilltop", first.name)
         assertEquals(37.422, first.point.latitude, 1e-9)
         assertEquals(-122.082, first.point.longitude, 1e-9)
@@ -59,8 +61,19 @@ class OutingShareCodecTest {
         assertEquals(2.5, first.bearing.halfWidthDeg, 1e-9)
         assertEquals(false, first.bidirectional)
         val second = share.readings[1]
+        assertEquals(readings[1].id, second.id)
         assertNull(second.name)
         assertEquals(true, second.bidirectional)
+    }
+
+    @Test
+    fun encodeReading_emits_single_reading_with_parent_outing_meta() {
+        val text = OutingShareCodec.encodeReading(outing, readings[0])
+        val share = OutingShareCodec.decode(text).getOrThrow()
+        assertEquals(outing.id, share.outingId)
+        assertEquals(outing.name, share.outingName)
+        assertEquals(1, share.readings.size)
+        assertEquals(readings[0].id, share.readings[0].id)
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.io.OutingShareCodec
 import com.trigeo.app.sensors.CompassReading
 import com.trigeo.app.sensors.CompassService
 import com.trigeo.app.sensors.LocationService
@@ -102,6 +103,11 @@ class OutingMapViewModel(
 
     fun setVisible(id: UUID, visible: Boolean) {
         viewModelScope.launch { readingsRepo.setVisible(id, visible) }
+    }
+
+    fun shareReadingText(reading: Reading, onReady: (String) -> Unit) {
+        val parent = outing.value ?: return
+        onReady(OutingShareCodec.encodeReading(parent, reading))
     }
 
     companion object {
