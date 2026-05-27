@@ -200,6 +200,7 @@ fun OutingMapScreen(
                     readings = readings,
                     cameraRequest = cameraRequest,
                     liveLocation = liveLocation?.let { GeoPoint(it.latitude, it.longitude) },
+                    liveAccuracyMeters = liveLocation?.takeIf { it.hasAccuracy() }?.accuracy,
                     liveBearingDeg = liveCompass?.trueDeg,
                     liveUncertaintyDeg = defaultUncertaintyDeg.toDouble(),
                     liveBidirectional = defaultBidirectional,

@@ -70,6 +70,9 @@ private const val LYR_FIX_ELLIPSE_LINE = "trigeo-fix-ellipse-line-lyr"
 private const val SRC_PENDING = "trigeo-pending-point"
 private const val LYR_PENDING = "trigeo-pending-point-lyr"
 
+private const val SRC_GPS_ACCURACY = "trigeo-gps-accuracy"
+private const val LYR_GPS_ACCURACY = "trigeo-gps-accuracy-lyr"
+
 private const val ELLIPSE_SIGMA = 2.0
 
 data class CameraRequest(val point: GeoPoint, val token: Long = System.nanoTime())
@@ -86,6 +89,7 @@ fun OutingMap(
     readings: List<Reading>,
     cameraRequest: CameraRequest?,
     liveLocation: GeoPoint?,
+    liveAccuracyMeters: Float?,
     liveBearingDeg: Double?,
     liveUncertaintyDeg: Double,
     liveBidirectional: Boolean,
@@ -162,6 +166,11 @@ fun OutingMap(
         pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional)
     }
 
+    LaunchedEffect(liveLocation, liveAccuracyMeters, styleRef) {
+        val style = styleRef ?: return@LaunchedEffect
+        pushGpsAccuracyData(style, liveLocation, liveAccuracyMeters)
+    }
+
     LaunchedEffect(fix, styleRef) {
         val style = styleRef ?: return@LaunchedEffect
         pushFixData(style, fix)
@@ -209,7 +218,14 @@ private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_FIX_ELLIPSE))
     style.addSource(GeoJsonSource(SRC_FIX_POINT))
     style.addSource(GeoJsonSource(SRC_PENDING))
+    style.addSource(GeoJsonSource(SRC_GPS_ACCURACY))
 
+    style.addLayer(
+        FillLayer(LYR_GPS_ACCURACY, SRC_GPS_ACCURACY).withProperties(
+            fillColor("#1F4E79"),
+            fillOpacity(0.10f),
+        ),
+    )
     style.addLayer(
         FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
             fillColor("#F2C94C"),
@@ -280,6 +296,30 @@ private fun addOverlayLayers(style: Style) {
             circleColor("#F2C94C"),
             circleStrokeColor("#1E293B"),
             circleStrokeWidth(3f),
+        ),
+    )
+}
+
+private fun pushGpsAccuracyData(
+    style: Style,
+    location: GeoPoint?,
+    accuracyMeters: Float?,
+) {
+    val src = style.getSource(SRC_GPS_ACCURACY) as? GeoJsonSource ?: return
+    if (location == null || accuracyMeters == null || accuracyMeters <= 0f) {
+        src.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        return
+    }
+    val steps = 48
+    val ring = mutableListOf<Point>()
+    for (i in 0..steps) {
+        val bearing = 360.0 * (i.toDouble() / steps)
+        val v = Geodesy.destination(location, bearing, accuracyMeters.toDouble())
+        ring.add(Point.fromLngLat(v.longitude, v.latitude))
+    }
+    src.setGeoJson(
+        FeatureCollection.fromFeatures(
+            listOf(Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))),
         ),
     )
 }

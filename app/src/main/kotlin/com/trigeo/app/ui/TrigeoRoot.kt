@@ -1,12 +1,14 @@
 package com.trigeo.app.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.trigeo.app.TrigeoApp
+import com.trigeo.app.ui.permissions.rememberLocationPermission
 import com.trigeo.app.ui.outings.OutingsListScreen
 import com.trigeo.app.ui.outings.OutingsViewModel
 import com.trigeo.app.ui.map.OutingMapScreen
@@ -22,6 +24,11 @@ import java.util.UUID
 fun TrigeoRoot() {
     val nav = rememberNavController()
     val app = LocalContext.current.applicationContext as TrigeoApp
+
+    val locationPermission = rememberLocationPermission()
+    LaunchedEffect(Unit) {
+        if (!locationPermission.granted) locationPermission.request()
+    }
     NavHost(navController = nav, startDestination = "outings") {
         composable("outings") {
             val vm: OutingsViewModel = viewModel(

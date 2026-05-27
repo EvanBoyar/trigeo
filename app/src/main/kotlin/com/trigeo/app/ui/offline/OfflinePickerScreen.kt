@@ -77,6 +77,7 @@ fun OfflinePickerScreen(
                 readings = emptyList(),
                 cameraRequest = cameraRequest,
                 liveLocation = null,
+                liveAccuracyMeters = null,
                 liveBearingDeg = null,
                 liveUncertaintyDeg = 0.0,
                 liveBidirectional = false,
