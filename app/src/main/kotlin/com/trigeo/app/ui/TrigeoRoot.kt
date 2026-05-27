@@ -42,6 +42,7 @@ fun TrigeoRoot() {
                     outingsRepo = app.outingsRepository,
                     readingsRepo = app.readingsRepository,
                     settingsRepo = app.settingsRepository,
+                    offlineRegionsRepo = app.offlineRegionsRepository,
                     locationService = app.locationService,
                     compassService = app.compassService,
                     outingId = outingId,
@@ -50,7 +51,12 @@ fun TrigeoRoot() {
             OutingMapScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
         composable("settings") {
-            val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app.settingsRepository))
+            val vm: SettingsViewModel = viewModel(
+                factory = SettingsViewModel.factory(
+                    app.settingsRepository,
+                    app.offlineRegionsRepository,
+                ),
+            )
             SettingsScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
     }

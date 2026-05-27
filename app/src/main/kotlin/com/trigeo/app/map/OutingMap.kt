@@ -74,6 +74,13 @@ private const val ELLIPSE_SIGMA = 2.0
 
 data class CameraRequest(val point: GeoPoint, val token: Long = System.nanoTime())
 
+class MapBoundsHolder {
+    @Volatile private var ref: MapLibreMap? = null
+    fun attach(map: MapLibreMap?) { ref = map }
+    fun visibleBounds(): org.maplibre.android.geometry.LatLngBounds? =
+        ref?.projection?.visibleRegion?.latLngBounds
+}
+
 @Composable
 fun OutingMap(
     readings: List<Reading>,
@@ -87,6 +94,7 @@ fun OutingMap(
     pendingPoint: GeoPoint?,
     bearingDeg: Double,
     rotationEnabled: Boolean,
+    boundsHolder: MapBoundsHolder,
     onLongPress: (GeoPoint) -> Unit,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
@@ -103,6 +111,7 @@ fun OutingMap(
         MapView(context).apply {
             getMapAsync { map ->
                 mapRef = map
+                boundsHolder.attach(map)
                 map.cameraPosition = CameraPosition.Builder()
                     .target(LatLng(20.0, 0.0))
                     .zoom(1.5)
@@ -137,7 +146,7 @@ fun OutingMap(
     LaunchedEffect(tileStyle, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         styleRef = null
-        map.setStyle(Style.Builder().fromJson(tileStyle.styleJson)) { style ->
+        map.setStyle(Style.Builder().fromUri(tileStyle.styleUri)) { style ->
             addOverlayLayers(style)
             styleRef = style
         }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ fun SettingsScreen(
 ) {
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
+    val offlineRegions by viewModel.offlineRegions.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
@@ -78,8 +80,68 @@ fun SettingsScreen(
                 steps = 28,
                 onChange = viewModel::setDefaultUncertaintyDeg,
             )
+            OfflineRegionsCard(
+                regions = offlineRegions,
+                onDelete = viewModel::deleteRegion,
+            )
         }
     }
+}
+
+@Composable
+private fun OfflineRegionsCard(
+    regions: List<com.trigeo.app.data.OfflineRegionInfo>,
+    onDelete: (Long) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Offline map regions", style = MaterialTheme.typography.titleMedium)
+            if (regions.isEmpty()) {
+                Text(
+                    "Nothing saved yet. Use Download area for offline on the map's layers menu.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                regions.forEach { region ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(region.name, style = MaterialTheme.typography.titleSmall)
+                            val zoom = "z%.0f-%.0f".format(region.minZoom, region.maxZoom)
+                            val size = formatBytes(region.downloadedBytes)
+                            val status = if (region.isComplete) "complete" else
+                                "${region.downloadedTiles}/${region.requiredTiles}"
+                            Text(
+                                "$zoom  •  $size  •  $status",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        androidx.compose.material3.IconButton(onClick = { onDelete(region.id) }) {
+                            androidx.compose.material3.Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete region",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    if (bytes < 1024 * 1024) return "%.1f KB".format(bytes / 1024.0)
+    return "%.1f MB".format(bytes / (1024.0 * 1024.0))
 }
 
 @Composable

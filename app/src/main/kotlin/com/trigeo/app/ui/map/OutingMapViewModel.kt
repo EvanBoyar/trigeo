@@ -4,8 +4,10 @@ import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.trigeo.app.data.OfflineRegionsRepository
 import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
+import com.trigeo.app.data.RegionProgress
 import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
@@ -16,6 +18,8 @@ import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.sensors.CompassReading
 import com.trigeo.app.sensors.CompassService
 import com.trigeo.app.sensors.LocationService
+import kotlinx.coroutines.flow.collect
+import org.maplibre.android.geometry.LatLngBounds
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,6 +33,7 @@ class OutingMapViewModel(
     private val outingsRepo: OutingsRepository,
     private val readingsRepo: ReadingsRepository,
     private val settingsRepo: SettingsRepository,
+    private val offlineRegionsRepo: OfflineRegionsRepository,
     private val locationService: LocationService,
     private val compassService: CompassService,
     private val outingId: UUID,
@@ -135,11 +140,26 @@ class OutingMapViewModel(
         onReady(OutingShareCodec.encodeReading(parent, reading))
     }
 
+    fun downloadRegion(
+        name: String,
+        tileStyle: MapTileStyle,
+        bounds: LatLngBounds,
+        minZoom: Double,
+        maxZoom: Double,
+        onProgress: (RegionProgress) -> Unit,
+    ) {
+        viewModelScope.launch {
+            offlineRegionsRepo.downloadRegion(name, tileStyle, bounds, minZoom, maxZoom)
+                .collect { onProgress(it) }
+        }
+    }
+
     companion object {
         fun factory(
             outingsRepo: OutingsRepository,
             readingsRepo: ReadingsRepository,
             settingsRepo: SettingsRepository,
+            offlineRegionsRepo: OfflineRegionsRepository,
             locationService: LocationService,
             compassService: CompassService,
             outingId: UUID,
@@ -147,7 +167,7 @@ class OutingMapViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 OutingMapViewModel(
-                    outingsRepo, readingsRepo, settingsRepo,
+                    outingsRepo, readingsRepo, settingsRepo, offlineRegionsRepo,
                     locationService, compassService, outingId,
                 ) as T
         }

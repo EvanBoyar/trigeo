@@ -48,8 +48,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.data.RegionProgress
 import com.trigeo.app.geo.Triangulation
 import com.trigeo.app.map.CameraRequest
+import com.trigeo.app.map.MapBoundsHolder
 import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.map.OutingMap
 import com.trigeo.app.ui.permissions.rememberLocationPermission
@@ -96,6 +98,10 @@ fun OutingMapScreen(
     var showLayers by remember { mutableStateOf(false) }
     var showFix by remember { mutableStateOf(true) }
     val panelOpen = showCapture || editTarget != null
+
+    val boundsHolder = remember { MapBoundsHolder() }
+    var downloadBounds by remember { mutableStateOf<org.maplibre.android.geometry.LatLngBounds?>(null) }
+    var downloadProgress by remember { mutableStateOf<RegionProgress?>(null) }
 
     val visibleReadings = remember(readings) { readings.filter { it.visible } }
     val fix = remember(visibleReadings, showFix) {
@@ -202,6 +208,7 @@ fun OutingMapScreen(
                     pendingPoint = if (showCapture) longPressPoint else null,
                     bearingDeg = mapBearing,
                     rotationEnabled = !lockToCompass,
+                    boundsHolder = boundsHolder,
                     onLongPress = { point ->
                         if (!panelOpen) {
                             longPressPoint = point
@@ -328,7 +335,29 @@ fun OutingMapScreen(
                 viewModel.setTileStyle(style)
                 showLayers = false
             },
+            onDownloadArea = {
+                showLayers = false
+                downloadBounds = boundsHolder.visibleBounds()
+                downloadProgress = null
+            },
             onDismiss = { showLayers = false },
+        )
+    }
+
+    downloadBounds?.let { b ->
+        DownloadRegionDialog(
+            bounds = b,
+            tileStyle = tileStyle,
+            progress = downloadProgress,
+            onConfirm = { name, minZoom, maxZoom ->
+                viewModel.downloadRegion(name, tileStyle, b, minZoom, maxZoom) { p ->
+                    downloadProgress = p
+                }
+            },
+            onDismiss = {
+                downloadBounds = null
+                downloadProgress = null
+            },
         )
     }
 }
@@ -338,6 +367,7 @@ fun OutingMapScreen(
 private fun LayersSheet(
     current: MapTileStyle,
     onSelect: (MapTileStyle) -> Unit,
+    onDownloadArea: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -357,6 +387,24 @@ private fun LayersSheet(
                     selected = style == current,
                     onClick = { onSelect(style) },
                 )
+            }
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onDownloadArea)
+                    .padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Download area for offline", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Cache the tiles currently in view at chosen zoom levels.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Spacer(Modifier.height(8.dp))
         }
