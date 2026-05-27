@@ -67,6 +67,7 @@ fun OutingMap(
     liveBearingDeg: Double?,
     liveUncertaintyDeg: Double,
     liveBidirectional: Boolean,
+    tileStyle: MapTileStyle,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
 ) {
@@ -85,10 +86,6 @@ fun OutingMap(
                     .target(LatLng(20.0, 0.0))
                     .zoom(1.5)
                     .build()
-                map.setStyle(Style.Builder().fromJson(TileStyles.osmRasterStyleJson)) { style ->
-                    addOverlayLayers(style)
-                    styleRef = style
-                }
             }
         }
     }
@@ -109,6 +106,15 @@ fun OutingMap(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             mapView.onDestroy()
+        }
+    }
+
+    LaunchedEffect(tileStyle, mapRef) {
+        val map = mapRef ?: return@LaunchedEffect
+        styleRef = null
+        map.setStyle(Style.Builder().fromJson(tileStyle.styleJson)) { style ->
+            addOverlayLayers(style)
+            styleRef = style
         }
     }
 

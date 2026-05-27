@@ -12,6 +12,7 @@ import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.io.OutingShareCodec
+import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.sensors.CompassReading
 import com.trigeo.app.sensors.CompassService
 import com.trigeo.app.sensors.LocationService
@@ -41,6 +42,13 @@ class OutingMapViewModel(
 
     val defaultBidirectional: StateFlow<Boolean> = settingsRepo.defaultBidirectional
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val tileStyle: StateFlow<MapTileStyle> = settingsRepo.tileStyle
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapTileStyle.OSM)
+
+    fun setTileStyle(value: MapTileStyle) {
+        viewModelScope.launch { settingsRepo.setTileStyle(value) }
+    }
 
     private val _liveLocation = MutableStateFlow<Location?>(null)
     val liveLocation: StateFlow<Location?> = _liveLocation.asStateFlow()

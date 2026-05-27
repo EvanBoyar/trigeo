@@ -1,23 +1,34 @@
 package com.trigeo.app.ui.map
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.map.OutingMap
 import com.trigeo.app.ui.permissions.rememberLocationPermission
 
@@ -48,6 +60,7 @@ fun OutingMapScreen(
     val liveLocation by viewModel.liveLocation.collectAsState()
     val liveCompass by viewModel.liveCompass.collectAsState()
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
+    val tileStyle by viewModel.tileStyle.collectAsState()
 
     val permission = rememberLocationPermission()
 
@@ -65,6 +78,7 @@ fun OutingMapScreen(
     var showCapture by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Reading?>(null) }
     var showPanel by remember { mutableStateOf(false) }
+    var showLayers by remember { mutableStateOf(false) }
     val panelOpen = showCapture || editTarget != null
 
     Scaffold(
@@ -84,6 +98,9 @@ fun OutingMapScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    SmallFloatingActionButton(onClick = { showLayers = true }) {
+                        Icon(Icons.Filled.Layers, contentDescription = "Map style")
+                    }
                     SmallFloatingActionButton(onClick = { showPanel = true }) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Readings")
                     }
@@ -108,6 +125,7 @@ fun OutingMapScreen(
                     liveBearingDeg = liveCompass?.trueDeg,
                     liveUncertaintyDeg = Defaults.UNCERTAINTY_DEG,
                     liveBidirectional = defaultBidirectional,
+                    tileStyle = tileStyle,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -194,5 +212,72 @@ fun OutingMapScreen(
             },
             onDismiss = { showPanel = false },
         )
+    }
+
+    if (showLayers) {
+        LayersSheet(
+            current = tileStyle,
+            onSelect = { style ->
+                viewModel.setTileStyle(style)
+                showLayers = false
+            },
+            onDismiss = { showLayers = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LayersSheet(
+    current: MapTileStyle,
+    onSelect: (MapTileStyle) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text("Map style", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider()
+            MapTileStyle.entries.forEach { style ->
+                StyleRow(
+                    style = style,
+                    selected = style == current,
+                    onClick = { onSelect(style) },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun StyleRow(
+    style: MapTileStyle,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(style.displayName, style = MaterialTheme.typography.titleMedium)
+            Text(
+                style.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

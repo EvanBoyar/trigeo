@@ -5,7 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.trigeo.app.map.MapTileStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,7 +24,18 @@ class SettingsRepository(context: Context) {
         store.edit { it[KEY_DEFAULT_BIDIRECTIONAL] = value }
     }
 
+    val tileStyle: Flow<MapTileStyle> =
+        store.data.map { prefs ->
+            val raw = prefs[KEY_TILE_STYLE]
+            MapTileStyle.entries.firstOrNull { it.name == raw } ?: MapTileStyle.OSM
+        }
+
+    suspend fun setTileStyle(value: MapTileStyle) {
+        store.edit { it[KEY_TILE_STYLE] = value.name }
+    }
+
     private companion object {
         val KEY_DEFAULT_BIDIRECTIONAL = booleanPreferencesKey("default_bidirectional")
+        val KEY_TILE_STYLE = stringPreferencesKey("tile_style")
     }
 }
