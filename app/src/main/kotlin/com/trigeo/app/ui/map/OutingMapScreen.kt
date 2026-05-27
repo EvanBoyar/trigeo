@@ -101,7 +101,7 @@ fun OutingMapScreen(
 
     val boundsHolder = remember { MapBoundsHolder() }
     var downloadBounds by remember { mutableStateOf<org.maplibre.android.geometry.LatLngBounds?>(null) }
-    var downloadProgress by remember { mutableStateOf<RegionProgress?>(null) }
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     val visibleReadings = remember(readings) { readings.filter { it.visible } }
     val fix = remember(visibleReadings, showFix) {
@@ -337,8 +337,8 @@ fun OutingMapScreen(
             },
             onDownloadArea = {
                 showLayers = false
+                viewModel.clearDownloadProgress()
                 downloadBounds = boundsHolder.visibleBounds()
-                downloadProgress = null
             },
             onDismiss = { showLayers = false },
         )
@@ -350,13 +350,12 @@ fun OutingMapScreen(
             tileStyle = tileStyle,
             progress = downloadProgress,
             onConfirm = { name, minZoom, maxZoom ->
-                viewModel.downloadRegion(name, tileStyle, b, minZoom, maxZoom) { p ->
-                    downloadProgress = p
-                }
+                viewModel.startDownload(name, tileStyle, b, minZoom, maxZoom)
             },
+            onCancel = { viewModel.cancelDownload() },
             onDismiss = {
                 downloadBounds = null
-                downloadProgress = null
+                viewModel.clearDownloadProgress()
             },
         )
     }

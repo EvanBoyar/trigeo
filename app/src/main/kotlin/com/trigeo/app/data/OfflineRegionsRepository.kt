@@ -2,11 +2,20 @@ package com.trigeo.app.data
 
 import android.content.Context
 import com.trigeo.app.map.MapTileStyle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -49,6 +58,50 @@ class OfflineRegionsRepository(context: Context) {
     }
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val _activeProgress = MutableStateFlow<RegionProgress?>(null)
+    val activeProgress: StateFlow<RegionProgress?> = _activeProgress.asStateFlow()
+    private var activeJob: Job? = null
+    private var activeRegionId: Long? = null
+
+    fun startDownload(
+        name: String,
+        tileStyle: MapTileStyle,
+        bounds: LatLngBounds,
+        minZoom: Double,
+        maxZoom: Double,
+    ) {
+        activeJob?.cancel()
+        activeRegionId = null
+        _activeProgress.value = null
+        activeJob = scope.launch {
+            downloadRegion(name, tileStyle, bounds, minZoom, maxZoom).collect { p ->
+                if (p is RegionProgress.Started) activeRegionId = p.regionId
+                _activeProgress.value = p
+            }
+        }
+    }
+
+    fun cancelActiveDownload() {
+        val id = activeRegionId
+        val job = activeJob
+        activeRegionId = null
+        activeJob = null
+        scope.launch {
+            if (id != null) {
+                runCatching { delete(id) }
+            }
+            job?.cancel()
+            _activeProgress.value = RegionProgress.Cancelled
+        }
+    }
+
+    fun clearActiveProgress() {
+        if (activeJob?.isActive == true) return
+        activeRegionId = null
+        _activeProgress.value = null
+    }
+
     suspend fun list(): List<OfflineRegionInfo> = suspendCoroutine { cont ->
         manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(regions: Array<OfflineRegion>?) {
@@ -86,7 +139,7 @@ class OfflineRegionsRepository(context: Context) {
         }
     }
 
-    fun downloadRegion(
+    private fun downloadRegion(
         name: String,
         tileStyle: MapTileStyle,
         bounds: LatLngBounds,
@@ -209,4 +262,5 @@ sealed class RegionProgress {
     ) : RegionProgress()
     data class Complete(val tiles: Long, val bytes: Long) : RegionProgress()
     data class Failed(val reason: String) : RegionProgress()
+    object Cancelled : RegionProgress()
 }

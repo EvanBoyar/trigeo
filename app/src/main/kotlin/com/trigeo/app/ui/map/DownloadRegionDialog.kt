@@ -32,6 +32,7 @@ fun DownloadRegionDialog(
     tileStyle: MapTileStyle,
     progress: RegionProgress?,
     onConfirm: (name: String, minZoom: Double, maxZoom: Double) -> Unit,
+    onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("Region") }
@@ -39,16 +40,27 @@ fun DownloadRegionDialog(
     var maxZoom by remember { mutableStateOf(min(16f, tileStyle.maxOfflineZoom.toFloat())) }
     val isActive = progress is RegionProgress.InFlight || progress is RegionProgress.Started
     val isComplete = progress is RegionProgress.Complete
+    val isCancelled = progress is RegionProgress.Cancelled
     val failed = progress as? RegionProgress.Failed
 
     AlertDialog(
         onDismissRequest = { if (!isActive) onDismiss() },
-        title = { Text(if (isComplete) "Download complete" else "Download offline region") },
+        title = {
+            Text(
+                when {
+                    isComplete -> "Download complete"
+                    isCancelled -> "Download cancelled"
+                    else -> "Download offline region"
+                },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (isComplete) {
                     val c = progress as RegionProgress.Complete
                     Text("${c.tiles} tiles, ${formatBytes(c.bytes)}.")
+                } else if (isCancelled) {
+                    Text("The partial region was deleted.")
                 } else {
                     OutlinedTextField(
                         value = name,
@@ -113,11 +125,11 @@ fun DownloadRegionDialog(
         },
         confirmButton = {
             when {
-                isComplete || failed != null -> {
+                isComplete || failed != null || isCancelled -> {
                     TextButton(onClick = onDismiss) { Text("Done") }
                 }
                 isActive -> {
-                    TextButton(onClick = {}, enabled = false) { Text("Downloading...") }
+                    TextButton(onClick = onCancel) { Text("Cancel download") }
                 }
                 else -> {
                     TextButton(onClick = {
@@ -127,7 +139,7 @@ fun DownloadRegionDialog(
             }
         },
         dismissButton = {
-            if (!isActive && !isComplete) {
+            if (!isActive && !isComplete && !isCancelled && failed == null) {
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         },

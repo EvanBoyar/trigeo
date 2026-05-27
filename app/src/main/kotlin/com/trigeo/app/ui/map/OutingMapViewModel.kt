@@ -140,18 +140,24 @@ class OutingMapViewModel(
         onReady(OutingShareCodec.encodeReading(parent, reading))
     }
 
-    fun downloadRegion(
+    val downloadProgress: StateFlow<RegionProgress?> = offlineRegionsRepo.activeProgress
+
+    fun startDownload(
         name: String,
         tileStyle: MapTileStyle,
         bounds: LatLngBounds,
         minZoom: Double,
         maxZoom: Double,
-        onProgress: (RegionProgress) -> Unit,
     ) {
-        viewModelScope.launch {
-            offlineRegionsRepo.downloadRegion(name, tileStyle, bounds, minZoom, maxZoom)
-                .collect { onProgress(it) }
-        }
+        offlineRegionsRepo.startDownload(name, tileStyle, bounds, minZoom, maxZoom)
+    }
+
+    fun cancelDownload() {
+        offlineRegionsRepo.cancelActiveDownload()
+    }
+
+    fun clearDownloadProgress() {
+        offlineRegionsRepo.clearActiveProgress()
     }
 
     companion object {

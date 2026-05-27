@@ -11,6 +11,8 @@ import com.trigeo.app.ui.outings.OutingsListScreen
 import com.trigeo.app.ui.outings.OutingsViewModel
 import com.trigeo.app.ui.map.OutingMapScreen
 import com.trigeo.app.ui.map.OutingMapViewModel
+import com.trigeo.app.ui.offline.OfflinePickerScreen
+import com.trigeo.app.ui.offline.OfflinePickerViewModel
 import com.trigeo.app.ui.settings.SettingsScreen
 import com.trigeo.app.ui.settings.SettingsViewModel
 import java.util.UUID
@@ -57,7 +59,20 @@ fun TrigeoRoot() {
                     app.offlineRegionsRepository,
                 ),
             )
-            SettingsScreen(viewModel = vm, onBack = { nav.popBackStack() })
+            SettingsScreen(
+                viewModel = vm,
+                onBack = { nav.popBackStack() },
+                onAddRegion = { nav.navigate("offline-picker") },
+            )
+        }
+        composable("offline-picker") {
+            val vm: OfflinePickerViewModel = viewModel(
+                factory = OfflinePickerViewModel.factory(
+                    app.settingsRepository,
+                    app.offlineRegionsRepository,
+                ),
+            )
+            OfflinePickerScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
     }
 }

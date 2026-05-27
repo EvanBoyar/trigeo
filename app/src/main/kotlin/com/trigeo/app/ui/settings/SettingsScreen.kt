@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
+    onAddRegion: () -> Unit,
 ) {
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
@@ -83,6 +84,7 @@ fun SettingsScreen(
             OfflineRegionsCard(
                 regions = offlineRegions,
                 onDelete = viewModel::deleteRegion,
+                onAddRegion = onAddRegion,
             )
         }
     }
@@ -92,6 +94,7 @@ fun SettingsScreen(
 private fun OfflineRegionsCard(
     regions: List<com.trigeo.app.data.OfflineRegionInfo>,
     onDelete: (Long) -> Unit,
+    onAddRegion: () -> Unit,
 ) {
     Card(shape = RoundedCornerShape(20.dp)) {
         Column(
@@ -100,10 +103,19 @@ private fun OfflineRegionsCard(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Offline map regions", style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Offline map regions",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                androidx.compose.material3.TextButton(onClick = onAddRegion) {
+                    Text("Add region")
+                }
+            }
             if (regions.isEmpty()) {
                 Text(
-                    "Nothing saved yet. Use Download area for offline on the map's layers menu.",
+                    "Nothing saved yet. Tap Add region above to pick an area on the map.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
