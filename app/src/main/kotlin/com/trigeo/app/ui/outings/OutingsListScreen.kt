@@ -249,7 +249,7 @@ private fun EmptyState(padding: PaddingValues) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Tap New outing to start a hunt.",
+                "Tap New outing to start.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
