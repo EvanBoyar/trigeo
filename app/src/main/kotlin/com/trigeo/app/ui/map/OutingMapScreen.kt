@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -43,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.geo.Triangulation
 import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.map.OutingMap
 import com.trigeo.app.ui.permissions.rememberLocationPermission
@@ -79,7 +81,13 @@ fun OutingMapScreen(
     var editTarget by remember { mutableStateOf<Reading?>(null) }
     var showPanel by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
+    var showFix by remember { mutableStateOf(true) }
     val panelOpen = showCapture || editTarget != null
+
+    val visibleReadings = remember(readings) { readings.filter { it.visible } }
+    val fix = remember(visibleReadings, showFix) {
+        if (showFix) Triangulation.solve(visibleReadings) else null
+    }
 
     Scaffold(
         topBar = {
@@ -98,6 +106,22 @@ fun OutingMapScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    SmallFloatingActionButton(
+                        onClick = { showFix = !showFix },
+                        containerColor = if (showFix)
+                            androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        else
+                            androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = if (showFix)
+                            androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                        else
+                            androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Icon(
+                            Icons.Filled.GpsFixed,
+                            contentDescription = if (showFix) "Hide fix" else "Show fix",
+                        )
+                    }
                     SmallFloatingActionButton(onClick = { showLayers = true }) {
                         Icon(Icons.Filled.Layers, contentDescription = "Map style")
                     }
@@ -126,6 +150,7 @@ fun OutingMapScreen(
                     liveUncertaintyDeg = defaultUncertaintyDeg.toDouble(),
                     liveBidirectional = defaultBidirectional,
                     tileStyle = tileStyle,
+                    fix = fix,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

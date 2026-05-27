@@ -18,6 +18,7 @@ import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.geo.Angles
 import com.trigeo.app.geo.Geodesy
+import com.trigeo.app.geo.TriangulationFix
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -59,6 +60,14 @@ private const val LYR_LIVE_POINT = "trigeo-live-point-lyr"
 private const val LYR_LIVE_LINE = "trigeo-live-line-lyr"
 private const val LYR_LIVE_CONE = "trigeo-live-cone-lyr"
 
+private const val SRC_FIX_POINT = "trigeo-fix-point"
+private const val SRC_FIX_ELLIPSE = "trigeo-fix-ellipse"
+private const val LYR_FIX_POINT = "trigeo-fix-point-lyr"
+private const val LYR_FIX_ELLIPSE_FILL = "trigeo-fix-ellipse-fill-lyr"
+private const val LYR_FIX_ELLIPSE_LINE = "trigeo-fix-ellipse-line-lyr"
+
+private const val ELLIPSE_SIGMA = 2.0
+
 @Composable
 fun OutingMap(
     readings: List<Reading>,
@@ -68,6 +77,7 @@ fun OutingMap(
     liveUncertaintyDeg: Double,
     liveBidirectional: Boolean,
     tileStyle: MapTileStyle,
+    fix: TriangulationFix?,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
 ) {
@@ -128,6 +138,11 @@ fun OutingMap(
         pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional)
     }
 
+    LaunchedEffect(fix, styleRef) {
+        val style = styleRef ?: return@LaunchedEffect
+        pushFixData(style, fix)
+    }
+
     LaunchedEffect(cameraTarget, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         if (cameraTarget != null) {
@@ -150,6 +165,8 @@ private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_LIVE_CONE))
     style.addSource(GeoJsonSource(SRC_LIVE_LINE))
     style.addSource(GeoJsonSource(SRC_LIVE_POINT))
+    style.addSource(GeoJsonSource(SRC_FIX_ELLIPSE))
+    style.addSource(GeoJsonSource(SRC_FIX_POINT))
 
     style.addLayer(
         FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
@@ -179,6 +196,19 @@ private fun addOverlayLayers(style: Style) {
         ),
     )
     style.addLayer(
+        FillLayer(LYR_FIX_ELLIPSE_FILL, SRC_FIX_ELLIPSE).withProperties(
+            fillColor("#EF4444"),
+            fillOpacity(0.18f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_FIX_ELLIPSE_LINE, SRC_FIX_ELLIPSE).withProperties(
+            lineColor("#EF4444"),
+            lineWidth(2f),
+            lineOpacity(0.9f),
+        ),
+    )
+    style.addLayer(
         CircleLayer(LYR_POINTS, SRC_POINTS).withProperties(
             circleRadius(7f),
             circleColor("#1F4E79"),
@@ -194,6 +224,63 @@ private fun addOverlayLayers(style: Style) {
             circleStrokeWidth(2f),
         ),
     )
+    style.addLayer(
+        CircleLayer(LYR_FIX_POINT, SRC_FIX_POINT).withProperties(
+            circleRadius(9f),
+            circleColor("#EF4444"),
+            circleStrokeColor("#FFFFFF"),
+            circleStrokeWidth(3f),
+        ),
+    )
+}
+
+private fun pushFixData(style: Style, fix: TriangulationFix?) {
+    val pointSource = style.getSource(SRC_FIX_POINT) as? GeoJsonSource
+    val ellipseSource = style.getSource(SRC_FIX_ELLIPSE) as? GeoJsonSource
+    if (fix == null) {
+        pointSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        ellipseSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        return
+    }
+    pointSource?.setGeoJson(
+        FeatureCollection.fromFeatures(
+            listOf(
+                Feature.fromGeometry(Point.fromLngLat(fix.point.longitude, fix.point.latitude)),
+            ),
+        ),
+    )
+    ellipseSource?.setGeoJson(
+        FeatureCollection.fromFeatures(listOf(buildEllipsePolygon(fix))),
+    )
+}
+
+private fun buildEllipsePolygon(fix: TriangulationFix): Feature {
+    val steps = 64
+    val a = fix.errorEllipse.semiMajorMeters * ELLIPSE_SIGMA
+    val b = fix.errorEllipse.semiMinorMeters * ELLIPSE_SIGMA
+    val orientRad = Math.toRadians(fix.errorEllipse.orientationDeg)
+    val majorEast = kotlin.math.sin(orientRad)
+    val majorNorth = kotlin.math.cos(orientRad)
+    val minorEast = kotlin.math.cos(orientRad)
+    val minorNorth = -kotlin.math.sin(orientRad)
+
+    val ring = mutableListOf<Point>()
+    for (i in 0..steps) {
+        val t = 2.0 * Math.PI * (i.toDouble() / steps)
+        val u = a * kotlin.math.cos(t)
+        val v = b * kotlin.math.sin(t)
+        val east = u * majorEast + v * minorEast
+        val north = u * majorNorth + v * minorNorth
+        val distance = kotlin.math.hypot(east, north)
+        if (distance < 1e-6) {
+            ring.add(Point.fromLngLat(fix.point.longitude, fix.point.latitude))
+            continue
+        }
+        val bearingDeg = Angles.normalize(Math.toDegrees(kotlin.math.atan2(east, north)))
+        val vertex = Geodesy.destination(fix.point, bearingDeg, distance)
+        ring.add(Point.fromLngLat(vertex.longitude, vertex.latitude))
+    }
+    return Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
 }
 
 private fun pushOverlayData(style: Style, readings: List<Reading>) {
