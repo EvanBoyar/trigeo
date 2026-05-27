@@ -6,12 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [OutingEntity::class],
-    version = 1,
+    entities = [OutingEntity::class, ReadingEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class TrigeoDatabase : RoomDatabase() {
     abstract fun outingDao(): OutingDao
+    abstract fun readingDao(): ReadingDao
 
     companion object {
         @Volatile private var instance: TrigeoDatabase? = null
@@ -21,7 +22,10 @@ abstract class TrigeoDatabase : RoomDatabase() {
                 context.applicationContext,
                 TrigeoDatabase::class.java,
                 "trigeo.db",
-            ).build().also { instance = it }
+            )
+                .fallbackToDestructiveMigration()
+                .build()
+                .also { instance = it }
         }
     }
 }
