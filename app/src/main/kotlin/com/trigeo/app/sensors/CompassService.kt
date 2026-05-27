@@ -27,12 +27,15 @@ data class CompassReading(
     val magneticDeg: Double,
     val declinationDeg: Double,
     val orientation: PhoneOrientation,
+    val accuracy: CompassAccuracy,
 )
 
 enum class PhoneOrientation {
     FLAT,             // screen up, top edge points at the target
     UPRIGHT_PORTRAIT, // screen vertical, back of phone points at the target
 }
+
+enum class CompassAccuracy { UNKNOWN, NO_CONTACT, UNRELIABLE, LOW, MEDIUM, HIGH }
 
 class CompassService(context: Context) {
 
@@ -67,6 +70,7 @@ class CompassService(context: Context) {
         val orientationOut = FloatArray(3)
         var smoothedSin = Double.NaN
         var smoothedCos = Double.NaN
+        var accuracyState = CompassAccuracy.UNKNOWN
 
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -132,11 +136,22 @@ class CompassService(context: Context) {
                         magneticDeg = magneticDeg,
                         declinationDeg = declinationDeg,
                         orientation = orientation,
+                        accuracy = accuracyState,
                     ),
                 )
             }
 
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+                if (sensor?.type != Sensor.TYPE_ROTATION_VECTOR) return
+                accuracyState = when (accuracy) {
+                    SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> CompassAccuracy.HIGH
+                    SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> CompassAccuracy.MEDIUM
+                    SensorManager.SENSOR_STATUS_ACCURACY_LOW -> CompassAccuracy.LOW
+                    SensorManager.SENSOR_STATUS_UNRELIABLE -> CompassAccuracy.UNRELIABLE
+                    SensorManager.SENSOR_STATUS_NO_CONTACT -> CompassAccuracy.NO_CONTACT
+                    else -> CompassAccuracy.UNKNOWN
+                }
+            }
         }
 
         sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)

@@ -44,6 +44,7 @@ import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.geo.Angles
+import com.trigeo.app.sensors.CompassAccuracy
 import com.trigeo.app.sensors.CompassReading
 
 enum class BearingMode { COMPASS, START_STOP, CUSTOM }
@@ -327,12 +328,16 @@ private fun BearingCard(
 @Composable
 private fun CompassReadout(liveCompass: CompassReading?) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            liveCompass?.let { "%.1f° true".format(it.trueDeg) } ?: "Waiting for compass...",
-            style = MaterialTheme.typography.displaySmall,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                liveCompass?.let { "%.1f° true".format(it.trueDeg) } ?: "Waiting for compass...",
+                style = MaterialTheme.typography.displaySmall,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            liveCompass?.let { CompassAccuracyBadge(it.accuracy) }
+        }
         liveCompass?.let {
             Text(
                 "Magnetic %.1f°  •  declination %+.1f°".format(it.magneticDeg, it.declinationDeg),
@@ -340,6 +345,52 @@ private fun CompassReadout(liveCompass: CompassReading?) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        if (liveCompass != null && liveCompass.accuracy.needsCalibration) {
+            CalibrationHint()
+        }
+    }
+}
+
+private val CompassAccuracy.needsCalibration: Boolean
+    get() = this == CompassAccuracy.LOW ||
+        this == CompassAccuracy.UNRELIABLE ||
+        this == CompassAccuracy.NO_CONTACT
+
+@Composable
+private fun CompassAccuracyBadge(accuracy: CompassAccuracy) {
+    val (label, color) = when (accuracy) {
+        CompassAccuracy.HIGH -> "Cal: high" to androidx.compose.ui.graphics.Color(0xFF2E7D32)
+        CompassAccuracy.MEDIUM -> "Cal: med" to androidx.compose.ui.graphics.Color(0xFF8E7700)
+        CompassAccuracy.LOW -> "Cal: low" to androidx.compose.ui.graphics.Color(0xFFE57C00)
+        CompassAccuracy.UNRELIABLE -> "Uncalibrated" to androidx.compose.ui.graphics.Color(0xFFC62828)
+        CompassAccuracy.NO_CONTACT -> "No signal" to androidx.compose.ui.graphics.Color(0xFFC62828)
+        CompassAccuracy.UNKNOWN -> "Cal: unknown" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = color.copy(alpha = 0.15f),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+        )
+    }
+}
+
+@Composable
+private fun CalibrationHint() {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Text(
+            "Compass needs calibration. Hold the phone and wave it in a figure-8 a few times.",
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
     }
 }
 
@@ -355,12 +406,19 @@ private fun StartStopCapture(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
-            liveCompass?.let { "%.1f° true".format(it.trueDeg) } ?: "Waiting for compass...",
-            style = MaterialTheme.typography.headlineMedium,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                liveCompass?.let { "%.1f° true".format(it.trueDeg) } ?: "Waiting for compass...",
+                style = MaterialTheme.typography.headlineMedium,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            liveCompass?.let { CompassAccuracyBadge(it.accuracy) }
+        }
+        if (liveCompass != null && liveCompass.accuracy.needsCalibration) {
+            CalibrationHint()
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(
                 onClick = { onChange(draft.copy(startBearingDeg = liveCompass?.trueDeg)) },
