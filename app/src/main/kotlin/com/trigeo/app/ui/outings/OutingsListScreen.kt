@@ -1,5 +1,7 @@
 package com.trigeo.app.ui.outings
 
+import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
@@ -42,8 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.trigeo.app.R
 import com.trigeo.app.domain.Outing
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -68,7 +72,16 @@ fun OutingsListScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text("Outings") },
+                title = { Text("Trigeo") },
+                navigationIcon = {
+                    Image(
+                        painter = painterResource(R.drawable.ic_launcher_foreground),
+                        contentDescription = "Trigeo",
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(40.dp),
+                    )
+                },
                 actions = {
                     IconButton(onClick = { showImport = true }) {
                         Icon(Icons.Filled.ContentPaste, contentDescription = "Import outing")
