@@ -210,6 +210,14 @@ fun OutingMapScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
+                fix?.let { f ->
+                    FixCoordinatesCard(
+                        fix = f,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 12.dp),
+                    )
+                }
             }
             if (showCapture) {
                 ReadingPanel(
