@@ -43,6 +43,13 @@ class OutingMapViewModel(
     val defaultBidirectional: StateFlow<Boolean> = settingsRepo.defaultBidirectional
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val defaultUncertaintyDeg: StateFlow<Float> = settingsRepo.defaultUncertaintyDeg
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            com.trigeo.app.domain.Defaults.UNCERTAINTY_DEG.toFloat(),
+        )
+
     val tileStyle: StateFlow<MapTileStyle> = settingsRepo.tileStyle
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapTileStyle.OSM)
 

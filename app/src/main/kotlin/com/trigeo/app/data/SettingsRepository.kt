@@ -5,8 +5,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.trigeo.app.domain.Defaults
 import com.trigeo.app.map.MapTileStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -34,8 +36,19 @@ class SettingsRepository(context: Context) {
         store.edit { it[KEY_TILE_STYLE] = value.name }
     }
 
+    val defaultUncertaintyDeg: Flow<Float> =
+        store.data.map { prefs ->
+            (prefs[KEY_DEFAULT_UNCERTAINTY] ?: Defaults.UNCERTAINTY_DEG.toFloat())
+                .coerceIn(1f, 30f)
+        }
+
+    suspend fun setDefaultUncertaintyDeg(value: Float) {
+        store.edit { it[KEY_DEFAULT_UNCERTAINTY] = value.coerceIn(1f, 30f) }
+    }
+
     private companion object {
         val KEY_DEFAULT_BIDIRECTIONAL = booleanPreferencesKey("default_bidirectional")
         val KEY_TILE_STYLE = stringPreferencesKey("tile_style")
+        val KEY_DEFAULT_UNCERTAINTY = floatPreferencesKey("default_uncertainty_deg")
     }
 }

@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -16,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -25,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +38,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
+    val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
@@ -63,6 +68,16 @@ fun SettingsScreen(
                 checked = defaultBidirectional,
                 onChange = viewModel::setDefaultBidirectional,
             )
+
+            SliderRow(
+                title = "Default uncertainty",
+                subtitle = "Starting half-cone width for new readings. Per-reading values can still be set in the capture panel.",
+                value = defaultUncertaintyDeg,
+                valueLabel = "%.0f°".format(defaultUncertaintyDeg),
+                valueRange = 1f..30f,
+                steps = 28,
+                onChange = viewModel::setDefaultUncertaintyDeg,
+            )
         }
     }
 }
@@ -90,6 +105,48 @@ private fun SwitchRow(
                 )
             }
             Switch(checked = checked, onCheckedChange = onChange)
+        }
+    }
+}
+
+@Composable
+private fun SliderRow(
+    title: String,
+    subtitle: String,
+    value: Float,
+    valueLabel: String,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onChange: (Float) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    valueLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = valueRange,
+                steps = steps,
+            )
         }
     }
 }

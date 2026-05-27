@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.map.MapTileStyle
@@ -60,6 +59,7 @@ fun OutingMapScreen(
     val liveLocation by viewModel.liveLocation.collectAsState()
     val liveCompass by viewModel.liveCompass.collectAsState()
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
+    val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val tileStyle by viewModel.tileStyle.collectAsState()
 
     val permission = rememberLocationPermission()
@@ -123,7 +123,7 @@ fun OutingMapScreen(
                     cameraTarget = cameraTarget,
                     liveLocation = liveLocation?.let { GeoPoint(it.latitude, it.longitude) },
                     liveBearingDeg = liveCompass?.trueDeg,
-                    liveUncertaintyDeg = Defaults.UNCERTAINTY_DEG,
+                    liveUncertaintyDeg = defaultUncertaintyDeg.toDouble(),
                     liveBidirectional = defaultBidirectional,
                     tileStyle = tileStyle,
                     modifier = Modifier.fillMaxSize(),
@@ -132,7 +132,10 @@ fun OutingMapScreen(
             if (showCapture) {
                 ReadingPanel(
                     title = "Add reading",
-                    initial = ReadingDraft(bidirectional = defaultBidirectional),
+                    initial = ReadingDraft(
+                        bidirectional = defaultBidirectional,
+                        uncertaintyDeg = defaultUncertaintyDeg,
+                    ),
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
                     liveLocation = liveLocation,
