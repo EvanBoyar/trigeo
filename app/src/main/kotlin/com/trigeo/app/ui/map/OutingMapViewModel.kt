@@ -1,36 +1,110 @@
 package com.trigeo.app.ui.map
 
+import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.trigeo.app.data.OutingsRepository
+import com.trigeo.app.data.ReadingsRepository
+import com.trigeo.app.domain.BearingCapture
+import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
+import com.trigeo.app.domain.Reading
+import com.trigeo.app.sensors.CompassReading
+import com.trigeo.app.sensors.CompassService
+import com.trigeo.app.sensors.LocationService
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 class OutingMapViewModel(
-    private val repo: OutingsRepository,
+    private val outingsRepo: OutingsRepository,
+    private val readingsRepo: ReadingsRepository,
+    private val locationService: LocationService,
+    private val compassService: CompassService,
     private val outingId: UUID,
 ) : ViewModel() {
 
     private val _outing = MutableStateFlow<Outing?>(null)
     val outing: StateFlow<Outing?> = _outing.asStateFlow()
 
+    val readings: StateFlow<List<Reading>> = readingsRepo.observeByOuting(outingId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _liveLocation = MutableStateFlow<Location?>(null)
+    val liveLocation: StateFlow<Location?> = _liveLocation.asStateFlow()
+
+    private val _liveCompass = MutableStateFlow<CompassReading?>(null)
+    val liveCompass: StateFlow<CompassReading?> = _liveCompass.asStateFlow()
+
+    private var locationJob: Job? = null
+    private var compassJob: Job? = null
+
     init {
-        viewModelScope.launch {
-            _outing.value = repo.get(outingId)
+        viewModelScope.launch { _outing.value = outingsRepo.get(outingId) }
+    }
+
+    fun startSensors() {
+        if (locationJob == null && locationService.hasPermission()) {
+            locationJob = viewModelScope.launch {
+                locationService.locationUpdates().collect { _liveLocation.value = it }
+            }
+        }
+        if (compassJob == null && compassService.isAvailable()) {
+            compassJob = viewModelScope.launch {
+                compassService.headingUpdates(
+                    latitudeProvider = { _liveLocation.value?.latitude ?: 0.0 },
+                    longitudeProvider = { _liveLocation.value?.longitude ?: 0.0 },
+                    altitudeMetersProvider = { _liveLocation.value?.altitude ?: 0.0 },
+                ).collect { _liveCompass.value = it }
+            }
         }
     }
 
+    fun stopSensors() {
+        locationJob?.cancel(); locationJob = null
+        compassJob?.cancel(); compassJob = null
+    }
+
+    override fun onCleared() {
+        stopSensors()
+        super.onCleared()
+    }
+
+    fun createReading(point: GeoPoint, bearing: BearingCapture, name: String?) {
+        viewModelScope.launch { readingsRepo.create(outingId, point, bearing, name) }
+    }
+
+    fun updateReading(reading: Reading) {
+        viewModelScope.launch { readingsRepo.update(reading) }
+    }
+
+    fun deleteReading(id: UUID) {
+        viewModelScope.launch { readingsRepo.delete(id) }
+    }
+
+    fun setVisible(id: UUID, visible: Boolean) {
+        viewModelScope.launch { readingsRepo.setVisible(id, visible) }
+    }
+
     companion object {
-        fun factory(repo: OutingsRepository, outingId: UUID): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    OutingMapViewModel(repo, outingId) as T
-            }
+        fun factory(
+            outingsRepo: OutingsRepository,
+            readingsRepo: ReadingsRepository,
+            locationService: LocationService,
+            compassService: CompassService,
+            outingId: UUID,
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                OutingMapViewModel(
+                    outingsRepo, readingsRepo, locationService, compassService, outingId,
+                ) as T
+        }
     }
 }

@@ -1,0 +1,325 @@
+package com.trigeo.app.ui.map
+
+import android.location.Location
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedAssistChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import com.trigeo.app.domain.BearingCapture
+import com.trigeo.app.domain.Defaults
+import com.trigeo.app.domain.GeoPoint
+import com.trigeo.app.domain.Reading
+import com.trigeo.app.geo.Angles
+import com.trigeo.app.sensors.CompassReading
+import com.trigeo.app.sensors.PhoneOrientation
+
+data class ReadingDraft(
+    val name: String = "",
+    val useGps: Boolean = true,
+    val manualLat: String = "",
+    val manualLon: String = "",
+    val useCompass: Boolean = true,
+    val manualBearingDeg: String = "",
+    val uncertaintyDeg: Float = Defaults.UNCERTAINTY_DEG.toFloat(),
+)
+
+fun ReadingDraft.toReadingValues(
+    liveLocation: Location?,
+    liveCompass: CompassReading?,
+): Triple<GeoPoint?, BearingCapture?, String?> {
+    val point: GeoPoint? = if (useGps) {
+        liveLocation?.let { GeoPoint(it.latitude, it.longitude) }
+    } else {
+        val lat = manualLat.toDoubleOrNull()
+        val lon = manualLon.toDoubleOrNull()
+        if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0) {
+            GeoPoint(lat, lon)
+        } else null
+    }
+    val centerDeg: Double? = if (useCompass) liveCompass?.trueDeg
+    else manualBearingDeg.toDoubleOrNull()?.let { Angles.normalize(it) }
+    val bearing = centerDeg?.let { BearingCapture.fromCenter(it, uncertaintyDeg.toDouble()) }
+    return Triple(point, bearing, name.trim().ifBlank { null })
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReadingSheet(
+    title: String,
+    initial: ReadingDraft,
+    locationPermissionGranted: Boolean,
+    onRequestPermission: () -> Unit,
+    liveLocation: Location?,
+    liveCompass: CompassReading?,
+    onSave: (GeoPoint, BearingCapture, String?) -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var draft by remember { mutableStateOf(initial) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.headlineSmall)
+
+            if (!locationPermissionGranted) {
+                PermissionBanner(onRequest = onRequestPermission)
+            }
+
+            LocationCard(
+                draft = draft,
+                liveLocation = liveLocation,
+                onChange = { draft = it },
+            )
+
+            BearingCard(
+                draft = draft,
+                liveCompass = liveCompass,
+                onChange = { draft = it },
+            )
+
+            UncertaintyCard(
+                value = draft.uncertaintyDeg,
+                onChange = { draft = draft.copy(uncertaintyDeg = it) },
+            )
+
+            OutlinedTextField(
+                value = draft.name,
+                onValueChange = { draft = draft.copy(name = it) },
+                label = { Text("Name (optional)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            val (point, bearing, name) = draft.toReadingValues(liveLocation, liveCompass)
+            val canSave = point != null && bearing != null
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onDelete != null) {
+                    OutlinedButton(onClick = onDelete) { Text("Delete") }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                Button(
+                    enabled = canSave,
+                    onClick = { onSave(point!!, bearing!!, name) },
+                ) { Text(if (onDelete != null) "Save" else "Add reading") }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun PermissionBanner(onRequest: () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Location permission needed",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Text(
+                "Grant location to use your current GPS for the reading. You can still enter coordinates manually.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            Button(onClick = onRequest) { Text("Grant permission") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocationCard(
+    draft: ReadingDraft,
+    liveLocation: Location?,
+    onChange: (ReadingDraft) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Location", style = MaterialTheme.typography.titleMedium)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = draft.useGps,
+                    onClick = { onChange(draft.copy(useGps = true)) },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text("Use GPS") }
+                SegmentedButton(
+                    selected = !draft.useGps,
+                    onClick = { onChange(draft.copy(useGps = false)) },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text("Custom") }
+            }
+            if (draft.useGps) {
+                val text = liveLocation?.let { l ->
+                    "%.6f, %.6f  ±%.0f m".format(l.latitude, l.longitude, l.accuracy)
+                } ?: "Waiting for GPS fix..."
+                Text(text, style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Monospace)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = draft.manualLat,
+                        onValueChange = { onChange(draft.copy(manualLat = it)) },
+                        label = { Text("Latitude") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = draft.manualLon,
+                        onValueChange = { onChange(draft.copy(manualLon = it)) },
+                        label = { Text("Longitude") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BearingCard(
+    draft: ReadingDraft,
+    liveCompass: CompassReading?,
+    onChange: (ReadingDraft) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Bearing", style = MaterialTheme.typography.titleMedium)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                SegmentedButton(
+                    selected = draft.useCompass,
+                    onClick = { onChange(draft.copy(useCompass = true)) },
+                    shape = SegmentedButtonDefaults.itemShape(0, 2),
+                ) { Text("Use compass") }
+                SegmentedButton(
+                    selected = !draft.useCompass,
+                    onClick = { onChange(draft.copy(useCompass = false)) },
+                    shape = SegmentedButtonDefaults.itemShape(1, 2),
+                ) { Text("Custom") }
+            }
+            if (draft.useCompass) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        liveCompass?.let { "%.1f° true".format(it.trueDeg) } ?: "Waiting for compass...",
+                        style = MaterialTheme.typography.displaySmall,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    liveCompass?.let { OrientationHint(it.orientation) }
+                    liveCompass?.let {
+                        Text(
+                            "Magnetic %.1f°  •  declination %+.1f°".format(
+                                it.magneticDeg, it.declinationDeg,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = draft.manualBearingDeg,
+                    onValueChange = { onChange(draft.copy(manualBearingDeg = it)) },
+                    label = { Text("Bearing (degrees true)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrientationHint(orientation: PhoneOrientation) {
+    val (icon, label) = when (orientation) {
+        PhoneOrientation.FLAT -> Icons.Filled.PhoneAndroid to "Flat. Top edge toward signal."
+        PhoneOrientation.UPRIGHT_PORTRAIT -> Icons.Filled.Smartphone to "Upright. Back of phone toward signal."
+    }
+    ElevatedAssistChip(
+        onClick = {},
+        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        label = { Text(label) },
+        colors = AssistChipDefaults.elevatedAssistChipColors(),
+    )
+}
+
+@Composable
+private fun UncertaintyCard(
+    value: Float,
+    onChange: (Float) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Uncertainty", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "%.0f°".format(value),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = 1f..30f,
+                steps = 28,
+            )
+        }
+    }
+}

@@ -33,7 +33,13 @@ fun TrigeoRoot() {
                 return@composable
             }
             val vm: OutingMapViewModel = viewModel(
-                factory = OutingMapViewModel.factory(app.outingsRepository, outingId),
+                factory = OutingMapViewModel.factory(
+                    outingsRepo = app.outingsRepository,
+                    readingsRepo = app.readingsRepository,
+                    locationService = app.locationService,
+                    compassService = app.compassService,
+                    outingId = outingId,
+                ),
             )
             OutingMapScreen(viewModel = vm, onBack = { nav.popBackStack() })
         }
