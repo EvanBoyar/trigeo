@@ -1,9 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+}
+
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
 }
 
 val syncManualToAssets by tasks.registering(Copy::class) {
@@ -26,9 +33,21 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        if (keystoreProps.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -70,9 +89,14 @@ android {
 }
 
 tasks.configureEach {
-    if (name.matches(Regex("merge.*Assets|generate.*Assets|package.*Assets"))) {
-        dependsOn(syncManualToAssets)
-    }
+    if (name == "syncManualToAssets") return@configureEach
+    val needs = name.contains("Assets") ||
+        name.contains("Lint") ||
+        name.startsWith("lint") ||
+        name.startsWith("merge") ||
+        name.startsWith("package") ||
+        name.startsWith("bundle")
+    if (needs) dependsOn(syncManualToAssets)
 }
 
 dependencies {
