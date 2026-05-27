@@ -67,6 +67,9 @@ private const val LYR_FIX_POINT = "trigeo-fix-point-lyr"
 private const val LYR_FIX_ELLIPSE_FILL = "trigeo-fix-ellipse-fill-lyr"
 private const val LYR_FIX_ELLIPSE_LINE = "trigeo-fix-ellipse-line-lyr"
 
+private const val SRC_PENDING = "trigeo-pending-point"
+private const val LYR_PENDING = "trigeo-pending-point-lyr"
+
 private const val ELLIPSE_SIGMA = 2.0
 
 @Composable
@@ -79,6 +82,7 @@ fun OutingMap(
     liveBidirectional: Boolean,
     tileStyle: MapTileStyle,
     fix: TriangulationFix?,
+    pendingPoint: GeoPoint?,
     onLongPress: (GeoPoint) -> Unit,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
@@ -150,6 +154,11 @@ fun OutingMap(
         pushFixData(style, fix)
     }
 
+    LaunchedEffect(pendingPoint, styleRef) {
+        val style = styleRef ?: return@LaunchedEffect
+        pushPendingData(style, pendingPoint)
+    }
+
     LaunchedEffect(cameraTarget, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         if (cameraTarget != null) {
@@ -174,6 +183,7 @@ private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_LIVE_POINT))
     style.addSource(GeoJsonSource(SRC_FIX_ELLIPSE))
     style.addSource(GeoJsonSource(SRC_FIX_POINT))
+    style.addSource(GeoJsonSource(SRC_PENDING))
 
     style.addLayer(
         FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
@@ -239,6 +249,27 @@ private fun addOverlayLayers(style: Style) {
             circleStrokeWidth(3f),
         ),
     )
+    style.addLayer(
+        CircleLayer(LYR_PENDING, SRC_PENDING).withProperties(
+            circleRadius(9f),
+            circleColor("#F2C94C"),
+            circleStrokeColor("#1E293B"),
+            circleStrokeWidth(3f),
+        ),
+    )
+}
+
+private fun pushPendingData(style: Style, point: GeoPoint?) {
+    val src = style.getSource(SRC_PENDING) as? GeoJsonSource ?: return
+    if (point == null) {
+        src.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    } else {
+        src.setGeoJson(
+            FeatureCollection.fromFeatures(
+                listOf(Feature.fromGeometry(Point.fromLngLat(point.longitude, point.latitude))),
+            ),
+        )
+    }
 }
 
 private fun pushFixData(style: Style, fix: TriangulationFix?) {

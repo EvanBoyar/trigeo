@@ -163,6 +163,7 @@ fun OutingMapScreen(
                     liveBidirectional = defaultBidirectional,
                     tileStyle = tileStyle,
                     fix = fix,
+                    pendingPoint = if (showCapture) longPressPoint else null,
                     onLongPress = { point ->
                         if (!panelOpen) {
                             longPressPoint = point
