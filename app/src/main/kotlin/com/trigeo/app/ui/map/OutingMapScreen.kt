@@ -15,7 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -118,7 +118,7 @@ fun OutingMapScreen(
                             androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                     ) {
                         Icon(
-                            Icons.Filled.GpsFixed,
+                            Icons.Filled.Close,
                             contentDescription = if (showFix) "Hide fix" else "Show fix",
                         )
                     }
