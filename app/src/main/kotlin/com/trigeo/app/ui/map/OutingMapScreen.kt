@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.map.OutingMap
@@ -100,6 +101,10 @@ fun OutingMapScreen(
                 OutingMap(
                     readings = readings,
                     cameraTarget = cameraTarget,
+                    liveLocation = liveLocation?.let { GeoPoint(it.latitude, it.longitude) },
+                    liveBearingDeg = liveCompass?.trueDeg,
+                    liveUncertaintyDeg = Defaults.UNCERTAINTY_DEG,
+                    liveBidirectional = defaultBidirectional,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

@@ -35,6 +35,7 @@ import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
+import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -51,10 +52,21 @@ private const val LYR_POINTS = "trigeo-points-lyr"
 private const val LYR_LINES = "trigeo-lines-lyr"
 private const val LYR_CONES = "trigeo-cones-lyr"
 
+private const val SRC_LIVE_POINT = "trigeo-live-point"
+private const val SRC_LIVE_LINE = "trigeo-live-line"
+private const val SRC_LIVE_CONE = "trigeo-live-cone"
+private const val LYR_LIVE_POINT = "trigeo-live-point-lyr"
+private const val LYR_LIVE_LINE = "trigeo-live-line-lyr"
+private const val LYR_LIVE_CONE = "trigeo-live-cone-lyr"
+
 @Composable
 fun OutingMap(
     readings: List<Reading>,
     cameraTarget: GeoPoint?,
+    liveLocation: GeoPoint?,
+    liveBearingDeg: Double?,
+    liveUncertaintyDeg: Double,
+    liveBidirectional: Boolean,
     cameraZoom: Double = 14.0,
     modifier: Modifier = Modifier,
 ) {
@@ -105,6 +117,11 @@ fun OutingMap(
         pushOverlayData(style, readings)
     }
 
+    LaunchedEffect(liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional, styleRef) {
+        val style = styleRef ?: return@LaunchedEffect
+        pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional)
+    }
+
     LaunchedEffect(cameraTarget, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         if (cameraTarget != null) {
@@ -124,7 +141,24 @@ private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_CONES))
     style.addSource(GeoJsonSource(SRC_LINES))
     style.addSource(GeoJsonSource(SRC_POINTS))
+    style.addSource(GeoJsonSource(SRC_LIVE_CONE))
+    style.addSource(GeoJsonSource(SRC_LIVE_LINE))
+    style.addSource(GeoJsonSource(SRC_LIVE_POINT))
 
+    style.addLayer(
+        FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
+            fillColor("#F2C94C"),
+            fillOpacity(0.12f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LIVE_LINE, SRC_LIVE_LINE).withProperties(
+            lineColor("#1F4E79"),
+            lineWidth(2.5f),
+            lineOpacity(0.7f),
+            lineDasharray(arrayOf(3f, 3f)),
+        ),
+    )
     style.addLayer(
         FillLayer(LYR_CONES, SRC_CONES).withProperties(
             fillColor("#F2C94C"),
@@ -146,6 +180,14 @@ private fun addOverlayLayers(style: Style) {
             circleStrokeWidth(2.5f),
         ),
     )
+    style.addLayer(
+        CircleLayer(LYR_LIVE_POINT, SRC_LIVE_POINT).withProperties(
+            circleRadius(6f),
+            circleColor("#F2994A"),
+            circleStrokeColor("#FFFFFF"),
+            circleStrokeWidth(2f),
+        ),
+    )
 }
 
 private fun pushOverlayData(style: Style, readings: List<Reading>) {
@@ -156,26 +198,70 @@ private fun pushOverlayData(style: Style, readings: List<Reading>) {
     }
     (style.getSource(SRC_POINTS) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(points))
 
-    val lines = visible.flatMap { r -> buildBearingLines(r) }
+    val lines = visible.flatMap { r ->
+        buildBearingLines(r.point, r.bearing.centerDeg, r.bidirectional)
+    }
     (style.getSource(SRC_LINES) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(lines))
 
-    val cones = visible.flatMap { r -> buildConePolygons(r) }
+    val cones = visible.flatMap { r ->
+        buildConePolygons(r.point, r.bearing.centerDeg, r.bearing.halfWidthDeg, r.bidirectional)
+    }
     (style.getSource(SRC_CONES) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(cones))
 }
 
-private fun buildBearingLines(reading: Reading): List<Feature> {
-    val origin = reading.point
+private fun pushLiveData(
+    style: Style,
+    location: GeoPoint?,
+    bearingDeg: Double?,
+    uncertaintyDeg: Double,
+    bidirectional: Boolean,
+) {
+    val pointSource = style.getSource(SRC_LIVE_POINT) as? GeoJsonSource
+    val lineSource = style.getSource(SRC_LIVE_LINE) as? GeoJsonSource
+    val coneSource = style.getSource(SRC_LIVE_CONE) as? GeoJsonSource
+
+    if (location == null) {
+        pointSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        lineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        coneSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        return
+    }
+
+    pointSource?.setGeoJson(
+        FeatureCollection.fromFeatures(
+            listOf(Feature.fromGeometry(Point.fromLngLat(location.longitude, location.latitude))),
+        ),
+    )
+
+    if (bearingDeg == null) {
+        lineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        coneSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        return
+    }
+
+    val lines = buildBearingLines(location, bearingDeg, bidirectional)
+    lineSource?.setGeoJson(FeatureCollection.fromFeatures(lines))
+
+    val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, bidirectional)
+    coneSource?.setGeoJson(FeatureCollection.fromFeatures(cones))
+}
+
+private fun buildBearingLines(
+    origin: GeoPoint,
+    centerDeg: Double,
+    bidirectional: Boolean,
+): List<Feature> {
     val originPt = Point.fromLngLat(origin.longitude, origin.latitude)
-    val forwardEnd = Geodesy.destination(origin, reading.bearing.centerDeg, Defaults.BEARING_LINE_METERS)
+    val forwardEnd = Geodesy.destination(origin, centerDeg, Defaults.BEARING_LINE_METERS)
     val forward = Feature.fromGeometry(
         LineString.fromLngLats(
             listOf(originPt, Point.fromLngLat(forwardEnd.longitude, forwardEnd.latitude)),
         ),
     )
-    if (!reading.bidirectional) return listOf(forward)
+    if (!bidirectional) return listOf(forward)
     val backEnd = Geodesy.destination(
         origin,
-        Angles.normalize(reading.bearing.centerDeg + 180.0),
+        Angles.normalize(centerDeg + 180.0),
         Defaults.BEARING_LINE_METERS,
     )
     val backward = Feature.fromGeometry(
@@ -186,20 +272,23 @@ private fun buildBearingLines(reading: Reading): List<Feature> {
     return listOf(forward, backward)
 }
 
-private fun buildConePolygons(reading: Reading): List<Feature> {
-    val forward = buildConePolygon(reading, reading.bearing.centerDeg)
-    if (!reading.bidirectional) return listOf(forward)
-    val backward = buildConePolygon(reading, Angles.normalize(reading.bearing.centerDeg + 180.0))
+private fun buildConePolygons(
+    origin: GeoPoint,
+    centerDeg: Double,
+    halfWidthDeg: Double,
+    bidirectional: Boolean,
+): List<Feature> {
+    val forward = buildConePolygon(origin, centerDeg, halfWidthDeg)
+    if (!bidirectional) return listOf(forward)
+    val backward = buildConePolygon(origin, Angles.normalize(centerDeg + 180.0), halfWidthDeg)
     return listOf(forward, backward)
 }
 
-private fun buildConePolygon(reading: Reading, centerDeg: Double): Feature {
-    val origin = reading.point
+private fun buildConePolygon(origin: GeoPoint, centerDeg: Double, halfWidthDeg: Double): Feature {
     val steps = 12
     val ring = mutableListOf(Point.fromLngLat(origin.longitude, origin.latitude))
-    val halfWidth = reading.bearing.halfWidthDeg
-    val start = Angles.normalize(centerDeg - halfWidth)
-    val span = halfWidth * 2.0
+    val start = Angles.normalize(centerDeg - halfWidthDeg)
+    val span = halfWidthDeg * 2.0
     for (i in 0..steps) {
         val deg = start + span * (i.toDouble() / steps)
         val e = Geodesy.destination(origin, deg, Defaults.BEARING_LINE_METERS)
