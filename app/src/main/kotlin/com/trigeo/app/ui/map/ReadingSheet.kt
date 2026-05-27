@@ -350,9 +350,7 @@ private fun StartStopCapture(
         liveCompass?.let { OrientationHint(it.orientation) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(
-                onClick = {
-                    onChange(draft.copy(startBearingDeg = liveCompass?.trueDeg, stopBearingDeg = null))
-                },
+                onClick = { onChange(draft.copy(startBearingDeg = liveCompass?.trueDeg)) },
                 enabled = liveCompass != null,
                 modifier = Modifier.weight(1f),
             ) {
