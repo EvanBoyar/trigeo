@@ -6,15 +6,21 @@ import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
 import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.data.TrigeoDatabase
+import com.trigeo.app.map.LocalStyleServer
 import com.trigeo.app.sensors.CompassService
 import com.trigeo.app.sensors.LocationService
 import java.io.File
 
 class TrigeoApp : Application() {
 
+    val styleServer: LocalStyleServer by lazy {
+        LocalStyleServer(File(filesDir, "styles"))
+    }
+
     override fun onCreate() {
         super.onCreate()
         copyStyleAssets()
+        styleServer.start()
     }
 
     private fun copyStyleAssets() {

@@ -1,21 +1,23 @@
 package com.trigeo.app.map
 
 import android.content.Context
-import android.net.Uri
-import java.io.File
+import com.trigeo.app.TrigeoApp
 
 enum class MapTileStyle {
     OSM,
     OPEN_TOPO,
     ;
 
-    fun styleUri(context: Context): String {
-        val filename = when (this) {
+    private val filename: String
+        get() = when (this) {
             OSM -> "osm.json"
             OPEN_TOPO -> "opentopo.json"
         }
-        val file = File(File(context.applicationContext.filesDir, "styles"), filename)
-        return Uri.fromFile(file).toString()
+
+    fun styleUri(context: Context): String {
+        val app = context.applicationContext as TrigeoApp
+        val port = app.styleServer.port
+        return "http://127.0.0.1:$port/$filename"
     }
 
     val maxOfflineZoom: Double
