@@ -8,8 +8,27 @@ import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.data.TrigeoDatabase
 import com.trigeo.app.sensors.CompassService
 import com.trigeo.app.sensors.LocationService
+import java.io.File
 
 class TrigeoApp : Application() {
+
+    override fun onCreate() {
+        super.onCreate()
+        copyStyleAssets()
+    }
+
+    private fun copyStyleAssets() {
+        val dir = File(filesDir, "styles")
+        if (!dir.exists()) dir.mkdirs()
+        listOf("osm.json", "opentopo.json").forEach { filename ->
+            val target = File(dir, filename)
+            // Always refresh so style updates ship correctly with new app versions.
+            assets.open("styles/$filename").use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+    }
+
     val database: TrigeoDatabase by lazy { TrigeoDatabase.get(this) }
     val outingsRepository: OutingsRepository by lazy { OutingsRepository(database.outingDao()) }
     val readingsRepository: ReadingsRepository by lazy { ReadingsRepository(database.readingDao()) }

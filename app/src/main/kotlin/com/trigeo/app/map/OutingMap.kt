@@ -146,7 +146,7 @@ fun OutingMap(
     LaunchedEffect(tileStyle, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
         styleRef = null
-        map.setStyle(Style.Builder().fromUri(tileStyle.styleUri)) { style ->
+        map.setStyle(Style.Builder().fromUri(tileStyle.styleUri(context))) { style ->
             addOverlayLayers(style)
             styleRef = style
         }

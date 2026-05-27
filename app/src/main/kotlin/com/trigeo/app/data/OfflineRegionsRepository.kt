@@ -147,7 +147,7 @@ class OfflineRegionsRepository(context: Context) {
         maxZoom: Double,
     ): Flow<RegionProgress> = callbackFlow {
         val definition = OfflineTilePyramidRegionDefinition(
-            tileStyle.styleUri,
+            tileStyle.styleUri(appContext),
             bounds,
             minZoom,
             maxZoom,
