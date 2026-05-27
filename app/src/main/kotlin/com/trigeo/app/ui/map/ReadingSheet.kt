@@ -9,22 +9,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedAssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,7 +45,6 @@ import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.geo.Angles
 import com.trigeo.app.sensors.CompassReading
-import com.trigeo.app.sensors.PhoneOrientation
 
 enum class BearingMode { COMPASS, START_STOP, CUSTOM }
 
@@ -341,7 +333,6 @@ private fun CompassReadout(liveCompass: CompassReading?) {
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold,
         )
-        liveCompass?.let { OrientationHint(it.orientation) }
         liveCompass?.let {
             Text(
                 "Magnetic %.1f°  •  declination %+.1f°".format(it.magneticDeg, it.declinationDeg),
@@ -370,7 +361,6 @@ private fun StartStopCapture(
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold,
         )
-        liveCompass?.let { OrientationHint(it.orientation) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(
                 onClick = { onChange(draft.copy(startBearingDeg = liveCompass?.trueDeg)) },
@@ -410,20 +400,6 @@ private fun StartStopCapture(
             }) { Text("Reset start/stop") }
         }
     }
-}
-
-@Composable
-private fun OrientationHint(orientation: PhoneOrientation) {
-    val (icon, label) = when (orientation) {
-        PhoneOrientation.FLAT -> Icons.Filled.PhoneAndroid to "Flat. Top edge toward signal."
-        PhoneOrientation.UPRIGHT_PORTRAIT -> Icons.Filled.Smartphone to "Upright. Back of phone toward signal."
-    }
-    ElevatedAssistChip(
-        onClick = {},
-        leadingIcon = { Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-        label = { Text(label) },
-        colors = AssistChipDefaults.elevatedAssistChipColors(),
-    )
 }
 
 @Composable
