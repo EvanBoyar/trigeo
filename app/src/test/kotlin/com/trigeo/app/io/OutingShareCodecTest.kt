@@ -4,6 +4,7 @@ import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -29,7 +30,7 @@ class OutingShareCodecTest {
             bearing = BearingCapture(120.5, 2.5),
             startBearingDeg = 118.0,
             stopBearingDeg = 123.0,
-            bidirectional = false,
+            direction = ReadingDirection.NORMAL,
             visible = true,
             createdAt = Instant.ofEpochMilli(1_716_817_100_000L),
         ),
@@ -41,7 +42,7 @@ class OutingShareCodecTest {
             bearing = BearingCapture(135.2, 5.0),
             startBearingDeg = null,
             stopBearingDeg = null,
-            bidirectional = true,
+            direction = ReadingDirection.BIDIRECTIONAL,
             visible = true,
             createdAt = Instant.ofEpochMilli(1_716_817_200_000L),
         ),
@@ -63,11 +64,11 @@ class OutingShareCodecTest {
         assertEquals(-122.082, first.point.longitude, 1e-9)
         assertEquals(120.5, first.bearing.centerDeg, 1e-9)
         assertEquals(2.5, first.bearing.halfWidthDeg, 1e-9)
-        assertEquals(false, first.bidirectional)
+        assertEquals(ReadingDirection.NORMAL, first.direction)
         val second = share.readings[1]
         assertEquals(readings[1].id, second.id)
         assertNull(second.name)
-        assertEquals(true, second.bidirectional)
+        assertEquals(ReadingDirection.BIDIRECTIONAL, second.direction)
     }
 
     @Test

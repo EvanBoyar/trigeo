@@ -1,6 +1,7 @@
 package com.trigeo.app.ui.map
 
 import android.location.Location
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,7 +27,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
+import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.geo.Angles
 import com.trigeo.app.sensors.CompassAccuracy
 import com.trigeo.app.sensors.CompassReading
@@ -59,7 +60,7 @@ data class ReadingDraft(
     val startBearingText: String = "",
     val stopBearingText: String = "",
     val uncertaintyDeg: Float = Defaults.UNCERTAINTY_DEG.toFloat(),
-    val bidirectional: Boolean = false,
+    val direction: ReadingDirection = ReadingDirection.NORMAL,
 )
 
 private fun ReadingDraft.bearingFromCompass(liveCompass: CompassReading?): BearingCapture? {
@@ -82,7 +83,7 @@ data class DraftValues(
     val point: GeoPoint?,
     val bearing: BearingCapture?,
     val name: String?,
-    val bidirectional: Boolean,
+    val direction: ReadingDirection,
     val startBearingDeg: Double?,
     val stopBearingDeg: Double?,
 )
@@ -114,7 +115,7 @@ fun ReadingDraft.toReadingValues(
         point = point,
         bearing = bearing,
         name = name.trim().ifBlank { null },
-        bidirectional = bidirectional,
+        direction = direction,
         startBearingDeg = savedStart,
         stopBearingDeg = savedStop,
     )
@@ -175,9 +176,9 @@ fun ReadingPanel(
                 )
             }
 
-            BidirectionalCard(
-                checked = draft.bidirectional,
-                onChange = { draft = draft.copy(bidirectional = it) },
+            DirectionCard(
+                direction = draft.direction,
+                onChange = { draft = draft.copy(direction = it) },
             )
 
             OutlinedTextField(
@@ -485,26 +486,56 @@ private fun StartStopField(
 }
 
 @Composable
-private fun BidirectionalCard(
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
+private fun DirectionCard(
+    direction: ReadingDirection,
+    onChange: (ReadingDirection) -> Unit,
 ) {
     Card(shape = RoundedCornerShape(20.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Bidirectional", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Draw the bearing through both directions. Use this for null-based antennas where the signal could be in front or behind.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Direction", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "How the bearing is drawn and used. Reversed flips it 180 degrees (e.g. navigating off a back null) while keeping the captured value.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            DirectionOption("Normal", "Forward only.", direction == ReadingDirection.NORMAL) {
+                onChange(ReadingDirection.NORMAL)
             }
-            Switch(checked = checked, onCheckedChange = onChange)
+            DirectionOption(
+                "Bidirectional",
+                "Both ways. For null antennas with a 180-degree ambiguity.",
+                direction == ReadingDirection.BIDIRECTIONAL,
+            ) { onChange(ReadingDirection.BIDIRECTIONAL) }
+            DirectionOption(
+                "Reversed",
+                "Opposite of the captured heading.",
+                direction == ReadingDirection.REVERSED,
+            ) { onChange(ReadingDirection.REVERSED) }
+        }
+    }
+}
+
+@Composable
+private fun DirectionOption(
+    label: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.RadioButton(selected = selected, onClick = onClick)
+        Column(modifier = Modifier.padding(start = 4.dp)) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

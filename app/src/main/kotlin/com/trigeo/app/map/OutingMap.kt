@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.geo.Angles
 import com.trigeo.app.geo.Geodesy
 import com.trigeo.app.geo.TriangulationFix
@@ -395,12 +396,12 @@ private fun pushOverlayData(style: Style, readings: List<Reading>) {
     (style.getSource(SRC_POINTS) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(points))
 
     val lines = visible.flatMap { r ->
-        buildBearingLines(r.point, r.bearing.centerDeg, r.bidirectional)
+        buildBearingLines(r.point, r.bearing.centerDeg, r.direction)
     }
     (style.getSource(SRC_LINES) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(lines))
 
     val cones = visible.flatMap { r ->
-        buildConePolygons(r.point, r.bearing.centerDeg, r.bearing.halfWidthDeg, r.bidirectional)
+        buildConePolygons(r.point, r.bearing.centerDeg, r.bearing.halfWidthDeg, r.direction)
     }
     (style.getSource(SRC_CONES) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(cones))
 }
@@ -435,50 +436,48 @@ private fun pushLiveData(
         return
     }
 
-    val lines = buildBearingLines(location, bearingDeg, bidirectional)
+    val direction =
+        if (bidirectional) ReadingDirection.BIDIRECTIONAL else ReadingDirection.NORMAL
+    val lines = buildBearingLines(location, bearingDeg, direction)
     lineSource?.setGeoJson(FeatureCollection.fromFeatures(lines))
 
-    val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, bidirectional)
+    val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, direction)
     coneSource?.setGeoJson(FeatureCollection.fromFeatures(cones))
 }
+
+private fun effectiveBearings(centerDeg: Double, direction: ReadingDirection): List<Double> =
+    when (direction) {
+        ReadingDirection.NORMAL -> listOf(Angles.normalize(centerDeg))
+        ReadingDirection.REVERSED -> listOf(Angles.normalize(centerDeg + 180.0))
+        ReadingDirection.BIDIRECTIONAL ->
+            listOf(Angles.normalize(centerDeg), Angles.normalize(centerDeg + 180.0))
+    }
 
 private fun buildBearingLines(
     origin: GeoPoint,
     centerDeg: Double,
-    bidirectional: Boolean,
+    direction: ReadingDirection,
 ): List<Feature> {
     val originPt = Point.fromLngLat(origin.longitude, origin.latitude)
-    val forwardEnd = Geodesy.destination(origin, centerDeg, Defaults.BEARING_LINE_METERS)
-    val forward = Feature.fromGeometry(
-        LineString.fromLngLats(
-            listOf(originPt, Point.fromLngLat(forwardEnd.longitude, forwardEnd.latitude)),
-        ),
-    )
-    if (!bidirectional) return listOf(forward)
-    val backEnd = Geodesy.destination(
-        origin,
-        Angles.normalize(centerDeg + 180.0),
-        Defaults.BEARING_LINE_METERS,
-    )
-    val backward = Feature.fromGeometry(
-        LineString.fromLngLats(
-            listOf(originPt, Point.fromLngLat(backEnd.longitude, backEnd.latitude)),
-        ),
-    )
-    return listOf(forward, backward)
+    return effectiveBearings(centerDeg, direction).map { deg ->
+        val end = Geodesy.destination(origin, deg, Defaults.BEARING_LINE_METERS)
+        Feature.fromGeometry(
+            LineString.fromLngLats(
+                listOf(originPt, Point.fromLngLat(end.longitude, end.latitude)),
+            ),
+        )
+    }
 }
 
 private fun buildConePolygons(
     origin: GeoPoint,
     centerDeg: Double,
     halfWidthDeg: Double,
-    bidirectional: Boolean,
-): List<Feature> {
-    val forward = buildConePolygon(origin, centerDeg, halfWidthDeg)
-    if (!bidirectional) return listOf(forward)
-    val backward = buildConePolygon(origin, Angles.normalize(centerDeg + 180.0), halfWidthDeg)
-    return listOf(forward, backward)
-}
+    direction: ReadingDirection,
+): List<Feature> =
+    effectiveBearings(centerDeg, direction).map { deg ->
+        buildConePolygon(origin, deg, halfWidthDeg)
+    }
 
 private fun buildConePolygon(origin: GeoPoint, centerDeg: Double, halfWidthDeg: Double): Feature {
     val steps = 12

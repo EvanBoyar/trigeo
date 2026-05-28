@@ -38,7 +38,7 @@ class TriangulationTest {
         bearing = BearingCapture(Angles.normalize(bearingDeg), halfWidthDeg),
         startBearingDeg = null,
         stopBearingDeg = null,
-        bidirectional = false,
+        direction = com.trigeo.app.domain.ReadingDirection.NORMAL,
         visible = true,
         createdAt = Instant.EPOCH,
     )

@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import java.time.Instant
 import java.util.UUID
 
@@ -32,7 +33,7 @@ data class ReadingEntity(
     val bearingHalfWidthDeg: Double,
     val startBearingDeg: Double?,
     val stopBearingDeg: Double?,
-    val bidirectional: Boolean,
+    val direction: String,
     val visible: Boolean,
     val createdAtEpochMs: Long,
 ) {
@@ -44,7 +45,8 @@ data class ReadingEntity(
         bearing = BearingCapture(bearingCenterDeg, bearingHalfWidthDeg),
         startBearingDeg = startBearingDeg,
         stopBearingDeg = stopBearingDeg,
-        bidirectional = bidirectional,
+        direction = ReadingDirection.entries.firstOrNull { it.name == direction }
+            ?: ReadingDirection.NORMAL,
         visible = visible,
         createdAt = Instant.ofEpochMilli(createdAtEpochMs),
     )
@@ -60,7 +62,7 @@ data class ReadingEntity(
             bearingHalfWidthDeg = reading.bearing.halfWidthDeg,
             startBearingDeg = reading.startBearingDeg,
             stopBearingDeg = reading.stopBearingDeg,
-            bidirectional = reading.bidirectional,
+            direction = reading.direction.name,
             visible = reading.visible,
             createdAtEpochMs = reading.createdAt.toEpochMilli(),
         )

@@ -13,6 +13,7 @@ import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.io.OutingShareCodec
 import com.trigeo.app.map.MapTileStyle
 import com.trigeo.app.sensors.CompassReading
@@ -107,7 +108,7 @@ class OutingMapViewModel(
         bearing: BearingCapture,
         startBearingDeg: Double?,
         stopBearingDeg: Double?,
-        bidirectional: Boolean,
+        direction: ReadingDirection,
         name: String?,
     ) {
         viewModelScope.launch {
@@ -117,7 +118,7 @@ class OutingMapViewModel(
                 bearing = bearing,
                 startBearingDeg = startBearingDeg,
                 stopBearingDeg = stopBearingDeg,
-                bidirectional = bidirectional,
+                direction = direction,
                 name = name,
             )
         }
@@ -125,20 +126,6 @@ class OutingMapViewModel(
 
     fun updateReading(reading: Reading) {
         viewModelScope.launch { readingsRepo.update(reading) }
-    }
-
-    fun reverseReading(reading: Reading) {
-        val flippedCenter = com.trigeo.app.geo.Angles.normalize(reading.bearing.centerDeg + 180.0)
-        val flipped = reading.copy(
-            bearing = BearingCapture(flippedCenter, reading.bearing.halfWidthDeg),
-            startBearingDeg = reading.startBearingDeg?.let {
-                com.trigeo.app.geo.Angles.normalize(it + 180.0)
-            },
-            stopBearingDeg = reading.stopBearingDeg?.let {
-                com.trigeo.app.geo.Angles.normalize(it + 180.0)
-            },
-        )
-        viewModelScope.launch { readingsRepo.update(flipped) }
     }
 
     fun deleteReading(id: UUID) {

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [OutingEntity::class, ReadingEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class TrigeoDatabase : RoomDatabase() {

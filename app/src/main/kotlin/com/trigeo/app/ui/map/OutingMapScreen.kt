@@ -231,7 +231,11 @@ fun OutingMapScreen(
                 ReadingPanel(
                     title = if (longPressPoint != null) "Add reading at point" else "Add reading",
                     initial = ReadingDraft(
-                        bidirectional = defaultBidirectional,
+                        direction = if (defaultBidirectional) {
+                            com.trigeo.app.domain.ReadingDirection.BIDIRECTIONAL
+                        } else {
+                            com.trigeo.app.domain.ReadingDirection.NORMAL
+                        },
                         uncertaintyDeg = defaultUncertaintyDeg,
                         useGps = longPressPoint == null,
                         manualLat = longPressPoint?.latitude?.let { "%.6f".format(it) }.orEmpty(),
@@ -247,7 +251,7 @@ fun OutingMapScreen(
                             bearing = values.bearing!!,
                             startBearingDeg = values.startBearingDeg,
                             stopBearingDeg = values.stopBearingDeg,
-                            bidirectional = values.bidirectional,
+                            direction = values.direction,
                             name = values.name,
                         )
                         showCapture = false
@@ -273,7 +277,7 @@ fun OutingMapScreen(
                         startBearingText = reading.startBearingDeg?.let { "%.1f".format(it) }.orEmpty(),
                         stopBearingText = reading.stopBearingDeg?.let { "%.1f".format(it) }.orEmpty(),
                         uncertaintyDeg = reading.bearing.uncertaintyDeg.toFloat(),
-                        bidirectional = reading.bidirectional,
+                        direction = reading.direction,
                     ),
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
@@ -286,7 +290,7 @@ fun OutingMapScreen(
                                 bearing = values.bearing!!,
                                 startBearingDeg = values.startBearingDeg,
                                 stopBearingDeg = values.stopBearingDeg,
-                                bidirectional = values.bidirectional,
+                                direction = values.direction,
                                 name = values.name,
                             ),
                         )
@@ -321,7 +325,6 @@ fun OutingMapScreen(
         ReadingsPanel(
             readings = readings,
             onToggleVisible = { id, visible -> viewModel.setVisible(id, visible) },
-            onReverse = { viewModel.reverseReading(it) },
             onEdit = { reading ->
                 showPanel = false
                 editTarget = reading

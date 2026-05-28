@@ -4,6 +4,7 @@ import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Outing
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -66,7 +67,8 @@ object OutingShareCodec {
         halfWidthDeg = bearing.halfWidthDeg,
         startBearingDeg = startBearingDeg,
         stopBearingDeg = stopBearingDeg,
-        bidirectional = if (bidirectional) 1 else 0,
+        bidirectional = if (direction == ReadingDirection.BIDIRECTIONAL) 1 else 0,
+        directionName = direction.name,
         createdAt = createdAt.toEpochMilli(),
     )
 
@@ -114,18 +116,24 @@ object OutingShareCodec {
         @SerialName("bs") val startBearingDeg: Double? = null,
         @SerialName("be") val stopBearingDeg: Double? = null,
         @SerialName("d") val bidirectional: Int = 0,
+        @SerialName("dn") val directionName: String? = null,
         @SerialName("t") val createdAt: Long,
     ) {
-        fun toShare(): ReadingShare = ReadingShare(
-            id = id?.let { runCatching { UUID.fromString(it) }.getOrNull() },
-            name = name,
-            point = GeoPoint(lat, lon),
-            bearing = BearingCapture(bearingDeg.coerceIn(0.0, 360.0), halfWidthDeg.coerceIn(0.0, 180.0)),
-            startBearingDeg = startBearingDeg,
-            stopBearingDeg = stopBearingDeg,
-            bidirectional = bidirectional != 0,
-            createdAt = Instant.ofEpochMilli(createdAt),
-        )
+        fun toShare(): ReadingShare {
+            val parsedDirection = directionName?.let { name ->
+                ReadingDirection.entries.firstOrNull { it.name == name }
+            } ?: if (bidirectional != 0) ReadingDirection.BIDIRECTIONAL else ReadingDirection.NORMAL
+            return ReadingShare(
+                id = id?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+                name = name,
+                point = GeoPoint(lat, lon),
+                bearing = BearingCapture(bearingDeg.coerceIn(0.0, 360.0), halfWidthDeg.coerceIn(0.0, 180.0)),
+                startBearingDeg = startBearingDeg,
+                stopBearingDeg = stopBearingDeg,
+                direction = parsedDirection,
+                createdAt = Instant.ofEpochMilli(createdAt),
+            )
+        }
     }
 }
 
@@ -143,6 +151,6 @@ data class ReadingShare(
     val bearing: BearingCapture,
     val startBearingDeg: Double?,
     val stopBearingDeg: Double?,
-    val bidirectional: Boolean,
+    val direction: ReadingDirection,
     val createdAt: Instant,
 )

@@ -3,6 +3,7 @@ package com.trigeo.app.data
 import com.trigeo.app.domain.BearingCapture
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
@@ -25,7 +26,7 @@ class ReadingsRepository(
         bearing: BearingCapture,
         startBearingDeg: Double?,
         stopBearingDeg: Double?,
-        bidirectional: Boolean,
+        direction: ReadingDirection,
         name: String? = null,
     ): Reading {
         val reading = Reading(
@@ -36,7 +37,7 @@ class ReadingsRepository(
             bearing = bearing,
             startBearingDeg = startBearingDeg,
             stopBearingDeg = stopBearingDeg,
-            bidirectional = bidirectional,
+            direction = direction,
             visible = true,
             createdAt = clock.instant(),
         )
@@ -56,7 +57,7 @@ class ReadingsRepository(
         bearing: BearingCapture,
         startBearingDeg: Double?,
         stopBearingDeg: Double?,
-        bidirectional: Boolean,
+        direction: ReadingDirection,
         createdAt: Instant,
     ): InsertOutcome {
         val id = readingId ?: idFactory()
@@ -71,7 +72,7 @@ class ReadingsRepository(
             bearing = bearing,
             startBearingDeg = startBearingDeg,
             stopBearingDeg = stopBearingDeg,
-            bidirectional = bidirectional,
+            direction = direction,
             visible = true,
             createdAt = createdAt,
         )

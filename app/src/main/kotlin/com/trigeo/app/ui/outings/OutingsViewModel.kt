@@ -81,7 +81,7 @@ class OutingsViewModel(
                     bearing = r.bearing,
                     startBearingDeg = r.startBearingDeg,
                     stopBearingDeg = r.stopBearingDeg,
-                    bidirectional = r.bidirectional,
+                    direction = r.direction,
                     createdAt = r.createdAt,
                 )
                 when (outcome) {

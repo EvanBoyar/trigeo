@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
@@ -38,7 +37,6 @@ import java.util.UUID
 fun ReadingsPanel(
     readings: List<Reading>,
     onToggleVisible: (UUID, Boolean) -> Unit,
-    onReverse: (Reading) -> Unit,
     onEdit: (Reading) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -64,7 +62,6 @@ fun ReadingsPanel(
                         ReadingRow(
                             reading = reading,
                             onToggle = { onToggleVisible(reading.id, !reading.visible) },
-                            onReverse = { onReverse(reading) },
                             onEdit = { onEdit(reading) },
                         )
                     }
@@ -78,7 +75,6 @@ fun ReadingsPanel(
 private fun ReadingRow(
     reading: Reading,
     onToggle: () -> Unit,
-    onReverse: () -> Unit,
     onEdit: () -> Unit,
 ) {
     Card(
@@ -120,17 +116,19 @@ private fun ReadingRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = FontFamily.Monospace,
                 )
+                val directionLabel = when (reading.direction) {
+                    com.trigeo.app.domain.ReadingDirection.NORMAL -> null
+                    com.trigeo.app.domain.ReadingDirection.BIDIRECTIONAL -> "both ways"
+                    com.trigeo.app.domain.ReadingDirection.REVERSED -> "reversed"
+                }
                 Text(
-                    "%.1f° ± %.1f°".format(reading.bearing.centerDeg, reading.bearing.halfWidthDeg),
+                    buildString {
+                        append("%.1f° ± %.1f°".format(reading.bearing.centerDeg, reading.bearing.halfWidthDeg))
+                        if (directionLabel != null) append("  •  $directionLabel")
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = FontFamily.Monospace,
-                )
-            }
-            IconButton(onClick = onReverse) {
-                Icon(
-                    Icons.Filled.SwapHoriz,
-                    contentDescription = "Reverse bearing 180 degrees",
                 )
             }
         }

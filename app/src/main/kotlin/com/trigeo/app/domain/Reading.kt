@@ -11,7 +11,7 @@ data class Reading(
     val bearing: BearingCapture,
     val startBearingDeg: Double?,
     val stopBearingDeg: Double?,
-    val bidirectional: Boolean,
+    val direction: ReadingDirection,
     val visible: Boolean,
     val createdAt: Instant,
 ) {
