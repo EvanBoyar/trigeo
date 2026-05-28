@@ -321,6 +321,7 @@ fun OutingMapScreen(
         ReadingsPanel(
             readings = readings,
             onToggleVisible = { id, visible -> viewModel.setVisible(id, visible) },
+            onReverse = { viewModel.reverseReading(it) },
             onEdit = { reading ->
                 showPanel = false
                 editTarget = reading

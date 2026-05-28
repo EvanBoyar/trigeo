@@ -127,6 +127,20 @@ class OutingMapViewModel(
         viewModelScope.launch { readingsRepo.update(reading) }
     }
 
+    fun reverseReading(reading: Reading) {
+        val flippedCenter = com.trigeo.app.geo.Angles.normalize(reading.bearing.centerDeg + 180.0)
+        val flipped = reading.copy(
+            bearing = BearingCapture(flippedCenter, reading.bearing.halfWidthDeg),
+            startBearingDeg = reading.startBearingDeg?.let {
+                com.trigeo.app.geo.Angles.normalize(it + 180.0)
+            },
+            stopBearingDeg = reading.stopBearingDeg?.let {
+                com.trigeo.app.geo.Angles.normalize(it + 180.0)
+            },
+        )
+        viewModelScope.launch { readingsRepo.update(flipped) }
+    }
+
     fun deleteReading(id: UUID) {
         viewModelScope.launch { readingsRepo.delete(id) }
     }
