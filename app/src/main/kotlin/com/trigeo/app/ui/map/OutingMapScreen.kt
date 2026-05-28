@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -31,11 +33,13 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
 import com.trigeo.app.data.RegionProgress
@@ -53,7 +60,10 @@ import com.trigeo.app.geo.Triangulation
 import com.trigeo.app.map.CameraRequest
 import com.trigeo.app.map.MapBoundsHolder
 import com.trigeo.app.map.MapTileStyle
+import com.trigeo.app.BuildConfig
 import com.trigeo.app.map.OutingMap
+import com.trigeo.app.sensors.CompassAccuracy
+import com.trigeo.app.sensors.DebugCompassOverride
 import com.trigeo.app.ui.permissions.rememberLocationPermission
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +77,7 @@ fun OutingMapScreen(
     val readings by viewModel.readings.collectAsState()
     val liveLocation by viewModel.liveLocation.collectAsState()
     val liveCompass by viewModel.liveCompass.collectAsState()
+    val compassAvailable = viewModel.compassAvailable
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
@@ -76,6 +87,19 @@ fun OutingMapScreen(
 
     LaunchedEffect(permission.granted) {
         if (permission.granted) viewModel.startSensors()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> viewModel.startSensors()
+                Lifecycle.Event.ON_STOP -> viewModel.stopSensors()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     var cameraRequest by remember { mutableStateOf<CameraRequest?>(null) }
@@ -219,13 +243,32 @@ fun OutingMapScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
-                fix?.let { f ->
-                    FixCoordinatesCard(
-                        fix = f,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 12.dp),
-                    )
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (!compassAvailable) {
+                        CompassWarningCard(
+                            headline = "No compass detected",
+                            detail = "This device has no compass. Add readings by entering the bearing manually.",
+                        )
+                    } else {
+                        val effectiveAccuracy =
+                            (if (BuildConfig.DEBUG) DebugCompassOverride.forcedAccuracy else null)
+                                ?: liveCompass?.accuracy
+                        effectiveAccuracy?.takeIf { it != CompassAccuracy.HIGH }?.let { acc ->
+                            CompassWarningCard(
+                                headline = "Compass calibration ${acc.calibrationLabel()}",
+                                detail = "Bearings may be off. Move the phone in a figure 8 to recalibrate.",
+                            )
+                        }
+                    }
+                    fix?.let { f ->
+                        FixCoordinatesCard(fix = f)
+                    }
                 }
             }
             if (showCapture) {
@@ -268,6 +311,7 @@ fun OutingMapScreen(
                 val hasStartStop = reading.startBearingDeg != null && reading.stopBearingDeg != null
                 ReadingPanel(
                     title = "Edit reading",
+                    capturedAtUtc = reading.createdAtUtc,
                     initial = ReadingDraft(
                         name = reading.name.orEmpty(),
                         useGps = false,
@@ -365,6 +409,47 @@ fun OutingMapScreen(
             },
         )
     }
+}
+
+@Composable
+private fun CompassWarningCard(
+    headline: String,
+    detail: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                Icons.Filled.Warning,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Column {
+                Text(headline, style = MaterialTheme.typography.labelLarge)
+                Text(detail, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun CompassAccuracy.calibrationLabel(): String = when (this) {
+    CompassAccuracy.HIGH -> "high"
+    CompassAccuracy.MEDIUM -> "medium"
+    CompassAccuracy.LOW -> "low"
+    CompassAccuracy.UNRELIABLE -> "unreliable"
+    CompassAccuracy.NO_CONTACT -> "unavailable"
+    CompassAccuracy.UNKNOWN -> "unknown"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -111,6 +111,13 @@ private fun ReadingRow(
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
+                    reading.createdAtUtc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
                     "%.5f, %.5f".format(reading.point.latitude, reading.point.longitude),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

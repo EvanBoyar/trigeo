@@ -16,12 +16,13 @@ import com.trigeo.app.domain.Reading
 import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.io.OutingShareCodec
 import com.trigeo.app.map.MapTileStyle
+import com.trigeo.app.BuildConfig
 import com.trigeo.app.sensors.CompassReading
 import com.trigeo.app.sensors.CompassService
+import com.trigeo.app.sensors.DebugCompassOverride
 import com.trigeo.app.sensors.LocationService
-import kotlinx.coroutines.flow.collect
+import com.trigeo.app.sensors.RestartableCollector
 import org.maplibre.android.geometry.LatLngBounds
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -70,39 +71,40 @@ class OutingMapViewModel(
         viewModelScope.launch { settingsRepo.setTileStyle(value) }
     }
 
-    private val _liveLocation = MutableStateFlow<Location?>(null)
-    val liveLocation: StateFlow<Location?> = _liveLocation.asStateFlow()
+    private val locationCollector = RestartableCollector<Location>(viewModelScope) {
+        if (locationService.hasPermission()) locationService.locationUpdates() else null
+    }
+    private val compassCollector = RestartableCollector<CompassReading>(viewModelScope) {
+        if (compassService.isAvailable()) {
+            compassService.headingUpdates(
+                latitudeProvider = { locationCollector.latest.value?.latitude ?: 0.0 },
+                longitudeProvider = { locationCollector.latest.value?.longitude ?: 0.0 },
+                altitudeMetersProvider = { locationCollector.latest.value?.altitude ?: 0.0 },
+            )
+        } else {
+            null
+        }
+    }
 
-    private val _liveCompass = MutableStateFlow<CompassReading?>(null)
-    val liveCompass: StateFlow<CompassReading?> = _liveCompass.asStateFlow()
+    val liveLocation: StateFlow<Location?> = locationCollector.latest
+    val liveCompass: StateFlow<CompassReading?> = compassCollector.latest
 
-    private var locationJob: Job? = null
-    private var compassJob: Job? = null
+    val compassAvailable: Boolean =
+        if (BuildConfig.DEBUG && DebugCompassOverride.forceNoCompass) false
+        else compassService.isAvailable()
 
     init {
         viewModelScope.launch { _outing.value = outingsRepo.get(outingId) }
     }
 
     fun startSensors() {
-        if (locationJob == null && locationService.hasPermission()) {
-            locationJob = viewModelScope.launch {
-                locationService.locationUpdates().collect { _liveLocation.value = it }
-            }
-        }
-        if (compassJob == null && compassService.isAvailable()) {
-            compassJob = viewModelScope.launch {
-                compassService.headingUpdates(
-                    latitudeProvider = { _liveLocation.value?.latitude ?: 0.0 },
-                    longitudeProvider = { _liveLocation.value?.longitude ?: 0.0 },
-                    altitudeMetersProvider = { _liveLocation.value?.altitude ?: 0.0 },
-                ).collect { _liveCompass.value = it }
-            }
-        }
+        locationCollector.start()
+        compassCollector.start()
     }
 
     fun stopSensors() {
-        locationJob?.cancel(); locationJob = null
-        compassJob?.cancel(); compassJob = null
+        locationCollector.stop()
+        compassCollector.stop()
     }
 
     override fun onCleared() {

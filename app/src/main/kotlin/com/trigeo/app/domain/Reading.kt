@@ -1,7 +1,12 @@
 package com.trigeo.app.domain
 
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.UUID
+
+private val UTC_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'").withZone(ZoneOffset.UTC)
 
 data class Reading(
     val id: UUID,
@@ -17,5 +22,8 @@ data class Reading(
 ) {
     val displayName: String
         get() = name?.takeIf { it.isNotBlank() }
-            ?: "Reading ${createdAt.toEpochMilli().toString().takeLast(4)}"
+            ?: "Reading ${id.toString().take(7)}"
+
+    val createdAtUtc: String
+        get() = UTC_FORMATTER.format(createdAt)
 }

@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.trigeo.app.BuildConfig
 import com.trigeo.app.R
 import com.trigeo.app.domain.Outing
 import java.time.ZoneId
@@ -88,6 +89,12 @@ fun OutingsListScreen(
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(bottom = 3.dp),
+                        )
+                        Text(
+                            "  v${BuildConfig.VERSION_NAME}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
                 },

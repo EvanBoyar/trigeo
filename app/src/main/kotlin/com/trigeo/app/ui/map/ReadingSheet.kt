@@ -126,6 +126,7 @@ fun ReadingDraft.toReadingValues(
 fun ReadingPanel(
     title: String,
     initial: ReadingDraft,
+    capturedAtUtc: String? = null,
     locationPermissionGranted: Boolean,
     onRequestPermission: () -> Unit,
     liveLocation: Location?,
@@ -152,6 +153,14 @@ fun ReadingPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
+            if (capturedAtUtc != null) {
+                Text(
+                    capturedAtUtc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
 
             if (!locationPermissionGranted) {
                 PermissionBanner(onRequest = onRequestPermission)
