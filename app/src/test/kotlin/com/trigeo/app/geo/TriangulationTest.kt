@@ -12,6 +12,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 
 class TriangulationTest {
@@ -110,5 +111,117 @@ class TriangulationTest {
         // that we got a fix and an ellipse with positive axes.
         fix!!
         assertTrue(fix.errorEllipse.semiMajorMeters >= fix.errorEllipse.semiMinorMeters)
+    }
+
+    // --- Range-aware (Stansfield) behavior -------------------------------
+
+    private val base = GeoPoint(40.0, -75.0)
+    private val mPerDegLon = 111_320.0 * cos(Math.toRadians(40.0))
+
+    // Place a reading at an east/north offset (meters) from `base`.
+    private fun stationAt(
+        eastM: Double,
+        northM: Double,
+        bearingDeg: Double,
+        halfWidthDeg: Double = 2.5,
+    ): Reading = reading(
+        lat = base.latitude + northM / 111_320.0,
+        lon = base.longitude + eastM / mPerDegLon,
+        bearingDeg = bearingDeg,
+        halfWidthDeg = halfWidthDeg,
+    )
+
+    private fun fixEast(fix: TriangulationFix): Double =
+        (fix.point.longitude - base.longitude) * mPerDegLon
+
+    private fun fixNorth(fix: TriangulationFix): Double =
+        (fix.point.latitude - base.latitude) * 111_320.0
+
+    private fun ellipseArea(fix: TriangulationFix): Double =
+        fix.errorEllipse.semiMajorMeters * fix.errorEllipse.semiMinorMeters
+
+    @Test
+    fun near_reading_dominates_a_far_one_that_disagrees() {
+        // A near reading insists the fix is on the line x=0; a far reading
+        // insists x=10. A third reading pins y=0. Angular-only weighting would
+        // split the difference at x=5; the range-aware fix must sit on top of
+        // the near reading's line instead.
+        val near = stationAt(eastM = 0.0, northM = -50.0, bearingDeg = 0.0) // line x=0, R=50
+        val far = stationAt(eastM = 10.0, northM = -2000.0, bearingDeg = 0.0) // line x=10, R=2000
+        val cross = stationAt(eastM = -2000.0, northM = 0.0, bearingDeg = 90.0) // line y=0
+
+        val fix = Triangulation.solve(listOf(near, far, cross))
+        assertNotNull(fix)
+        fix!!
+        assertTrue(
+            "fix should hug the near line (x~0), got east=${fixEast(fix)}",
+            fixEast(fix) < 1.0,
+        )
+        assertTrue("fix north should be ~0, got ${fixNorth(fix)}", kotlin.math.abs(fixNorth(fix)) < 1.0)
+    }
+
+    @Test
+    fun a_near_reading_shrinks_the_fix_more_than_a_far_one() {
+        val r1 = stationAt(eastM = -1000.0, northM = 0.0, bearingDeg = 90.0) // line y=0
+        val r2 = stationAt(eastM = 0.0, northM = -1000.0, bearingDeg = 0.0) // line x=0
+        val near = stationAt(eastM = 0.0, northM = -50.0, bearingDeg = 0.0) // line x=0, R=50
+        val far = stationAt(eastM = 0.0, northM = -2000.0, bearingDeg = 0.0) // line x=0, R=2000
+
+        val baseFix = Triangulation.solve(listOf(r1, r2))!!
+        val nearFix = Triangulation.solve(listOf(r1, r2, near))!!
+        val farFix = Triangulation.solve(listOf(r1, r2, far))!!
+
+        assertTrue("adding any reading should shrink the area", ellipseArea(nearFix) < ellipseArea(baseFix))
+        assertTrue(
+            "near (${ellipseArea(nearFix)}) should shrink more than far (${ellipseArea(farFix)})",
+            ellipseArea(nearFix) < ellipseArea(farFix),
+        )
+        assertTrue("near should shrink the area a lot", ellipseArea(nearFix) < 0.25 * ellipseArea(baseFix))
+    }
+
+    @Test
+    fun a_reading_on_top_of_the_fix_does_not_blow_up() {
+        // r1's line passes through the fix and its range collapses to ~0; the
+        // range floor must keep the weight (and the ellipse) finite.
+        val r1 = stationAt(eastM = 0.0, northM = 0.0, bearingDeg = 0.0) // line x=0, R~0
+        val r2 = stationAt(eastM = -1000.0, northM = 0.0, bearingDeg = 90.0) // line y=0
+
+        val fix = Triangulation.solve(listOf(r1, r2))
+        assertNotNull(fix)
+        fix!!
+        assertTrue(fix.point.latitude.isFinite() && fix.point.longitude.isFinite())
+        val major = fix.errorEllipse.semiMajorMeters
+        assertTrue("ellipse must stay finite and sane, got $major", major > 0.0 && major < 1e6)
+    }
+
+    @Test
+    fun the_ellipse_inflates_when_a_bearing_disagrees() {
+        val r1 = stationAt(eastM = -1000.0, northM = 0.0, bearingDeg = 90.0) // line y=0
+        val r2 = stationAt(eastM = 0.0, northM = -1000.0, bearingDeg = 0.0) // line x=0
+        val r3good = stationAt(eastM = -1000.0, northM = -1000.0, bearingDeg = 45.0) // through origin
+        val r3bad = stationAt(eastM = -1000.0, northM = -1000.0, bearingDeg = 65.0) // 20 deg off
+
+        val consistent = Triangulation.solve(listOf(r1, r2, r3good))!!
+        val disagreeing = Triangulation.solve(listOf(r1, r2, r3bad))!!
+
+        assertTrue(
+            "disagreement should inflate the ellipse: ${ellipseArea(disagreeing)} vs ${ellipseArea(consistent)}",
+            ellipseArea(disagreeing) > 3.0 * ellipseArea(consistent),
+        )
+    }
+
+    @Test
+    fun best_case_close_readings_give_a_single_digit_meter_ellipse() {
+        // Three readings ~100 m out, +/-2.5 deg, 120 deg apart, all on target.
+        val r1 = stationAt(eastM = 0.0, northM = 100.0, bearingDeg = 180.0)
+        val r2 = stationAt(eastM = 86.6, northM = -50.0, bearingDeg = 300.0)
+        val r3 = stationAt(eastM = -86.6, northM = -50.0, bearingDeg = 60.0)
+
+        val fix = Triangulation.solve(listOf(r1, r2, r3))
+        assertNotNull(fix)
+        fix!!
+        assertTrue("fix should land on target", hypot(fixEast(fix), fixNorth(fix)) < 1.0)
+        val major = fix.errorEllipse.semiMajorMeters
+        assertTrue("expected roughly 3-5 m, got $major", major in 2.5..5.0)
     }
 }

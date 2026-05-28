@@ -42,6 +42,17 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setTipButtonEnabled(value) }
     }
 
+    val minFixRangeMeters: StateFlow<Float> = repo.minFixRangeMeters
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            Defaults.MIN_FIX_RANGE_METERS.toFloat(),
+        )
+
+    fun setMinFixRangeMeters(value: Float) {
+        viewModelScope.launch { repo.setMinFixRangeMeters(value) }
+    }
+
     val offlineRegions: StateFlow<List<OfflineRegionInfo>> = offlineRegionsRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

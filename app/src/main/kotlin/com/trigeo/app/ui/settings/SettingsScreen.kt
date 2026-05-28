@@ -41,6 +41,7 @@ fun SettingsScreen(
 ) {
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
+    val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
     val tipButtonEnabled by viewModel.tipButtonEnabled.collectAsState()
     val offlineRegions by viewModel.offlineRegions.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -81,6 +82,15 @@ fun SettingsScreen(
                 valueRange = 1f..30f,
                 steps = 28,
                 onChange = viewModel::setDefaultUncertaintyDeg,
+            )
+            SliderRow(
+                title = "Close-range floor",
+                subtitle = "Closer readings count for more when triangulating. This floor stops a single very close bearing, where the antenna often swings, from taking over the fix.",
+                value = minFixRangeMeters,
+                valueLabel = "%.0f m".format(minFixRangeMeters),
+                valueRange = 5f..50f,
+                steps = 8,
+                onChange = viewModel::setMinFixRangeMeters,
             )
             OfflineRegionsCard(
                 regions = offlineRegions,

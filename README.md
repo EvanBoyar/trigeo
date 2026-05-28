@@ -59,6 +59,7 @@ The fine print: OpenStreetMap and OpenTopoMap public tile servers ask that you d
 
 - **Default bidirectional.** New readings start with the bidirectional toggle on.
 - **Default uncertainty.** Starting half-cone width.
+- **Close-range floor.** Stops a single very close bearing from taking over the fix. Default 25 m.
 - **Offline map regions.** Saved regions with their sizes; Add region opens the picker.
 - **Show tip button.** Hides the heart button on the home screen.
 
@@ -66,7 +67,7 @@ The fine print: OpenStreetMap and OpenTopoMap public tile servers ask that you d
 
 - Bearings are stored as true north, with the local magnetic declination from the World Magnetic Model applied at the reading's location.
 - Coordinates display at 6 decimal places (~10 cm precision). The triangulation math projects into a local east-north meter frame around the centroid, so it's accurate over the kilometers-scale areas typical of transmitter hunts.
-- The fix's error ellipse is 2-sigma derived from the covariance of the weighted normal equations. Weights are `1 / halfWidth^2`, clamped at 0.5 degrees, so a sharp reading pulls harder than a loose one.
+- The fix weights closer readings more heavily: a fixed angular error covers less ground the nearer you are, so a near bearing pins the spot harder than a far one (and a sharp cone harder than a wide one). The **Close-range floor** in Settings limits how much a single very close reading can take over. The 2-sigma error ellipse comes from the same weighting and grows when the bearings disagree.
 - Bearings are treated as lines, not rays. A fix can land behind a non-bidirectional reading if the geometry says so, which is usually a hint that someone aimed at the back null.
 
 ## Build

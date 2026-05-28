@@ -53,10 +53,24 @@ class SettingsRepository(context: Context) {
         store.edit { it[KEY_TIP_BUTTON_ENABLED] = value }
     }
 
+    val minFixRangeMeters: Flow<Float> =
+        store.data.map { prefs ->
+            (prefs[KEY_MIN_FIX_RANGE] ?: Defaults.MIN_FIX_RANGE_METERS.toFloat())
+                .coerceIn(MIN_FIX_RANGE_MIN, MIN_FIX_RANGE_MAX)
+        }
+
+    suspend fun setMinFixRangeMeters(value: Float) {
+        store.edit { it[KEY_MIN_FIX_RANGE] = value.coerceIn(MIN_FIX_RANGE_MIN, MIN_FIX_RANGE_MAX) }
+    }
+
     private companion object {
+        const val MIN_FIX_RANGE_MIN = 5f
+        const val MIN_FIX_RANGE_MAX = 50f
+
         val KEY_DEFAULT_BIDIRECTIONAL = booleanPreferencesKey("default_bidirectional")
         val KEY_TILE_STYLE = stringPreferencesKey("tile_style")
         val KEY_DEFAULT_UNCERTAINTY = floatPreferencesKey("default_uncertainty_deg")
         val KEY_TIP_BUTTON_ENABLED = booleanPreferencesKey("tip_button_enabled")
+        val KEY_MIN_FIX_RANGE = floatPreferencesKey("min_fix_range_meters")
     }
 }

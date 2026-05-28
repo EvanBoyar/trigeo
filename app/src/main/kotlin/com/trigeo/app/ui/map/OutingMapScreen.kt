@@ -69,6 +69,7 @@ fun OutingMapScreen(
     val liveCompass by viewModel.liveCompass.collectAsState()
     val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
+    val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
     val tileStyle by viewModel.tileStyle.collectAsState()
 
     val permission = rememberLocationPermission()
@@ -104,8 +105,8 @@ fun OutingMapScreen(
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
     val visibleReadings = remember(readings) { readings.filter { it.visible } }
-    val fix = remember(visibleReadings, showFix) {
-        if (showFix) Triangulation.solve(visibleReadings) else null
+    val fix = remember(visibleReadings, showFix, minFixRangeMeters) {
+        if (showFix) Triangulation.solve(visibleReadings, minFixRangeMeters.toDouble()) else null
     }
 
     Scaffold(

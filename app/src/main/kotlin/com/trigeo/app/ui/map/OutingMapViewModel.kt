@@ -59,6 +59,13 @@ class OutingMapViewModel(
     val tileStyle: StateFlow<MapTileStyle> = settingsRepo.tileStyle
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapTileStyle.OSM)
 
+    val minFixRangeMeters: StateFlow<Float> = settingsRepo.minFixRangeMeters
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            com.trigeo.app.domain.Defaults.MIN_FIX_RANGE_METERS.toFloat(),
+        )
+
     fun setTileStyle(value: MapTileStyle) {
         viewModelScope.launch { settingsRepo.setTileStyle(value) }
     }
