@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -44,6 +45,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import android.content.Intent
@@ -168,7 +170,6 @@ fun OutingMapScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (!panelOpen) {
                 Column(
@@ -313,6 +314,58 @@ fun OutingMapScreen(
                         .align(Alignment.TopCenter)
                         .padding(top = 4.dp),
                 )
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 24.dp)
+                        .widthIn(max = 200.dp),
+                ) { data ->
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        tonalElevation = 6.dp,
+                        shadowElevation = 6.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(
+                                start = 12.dp,
+                                end = 2.dp,
+                                top = 2.dp,
+                                bottom = 2.dp,
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                data.visuals.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            data.visuals.actionLabel?.let { label ->
+                                TextButton(
+                                    onClick = { data.performAction() },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                        horizontal = 8.dp,
+                                        vertical = 0.dp,
+                                    ),
+                                ) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+                            IconButton(
+                                onClick = { data.dismiss() },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Dismiss",
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 CenterlineTick(
                     pointingDown = false,
                     modifier = Modifier
