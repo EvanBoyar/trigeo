@@ -9,6 +9,7 @@ import java.util.UUID
 
 class OutingsRepository(
     private val dao: OutingDao,
+    private val backup: BackupNotifier? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val idFactory: () -> UUID = UUID::randomUUID,
 ) {
@@ -24,18 +25,22 @@ class OutingsRepository(
             createdAt = createdAt,
         )
         dao.upsert(OutingEntity.fromDomain(outing))
+        backup?.markStale()
         return outing
     }
 
     suspend fun rename(id: UUID, newName: String?) {
         dao.rename(id.toString(), newName?.takeIf { it.isNotBlank() })
+        backup?.markStale()
     }
 
     suspend fun delete(id: UUID) {
         dao.delete(id.toString())
+        backup?.markStale()
     }
 
     suspend fun restore(outing: Outing) {
         dao.upsert(OutingEntity.fromDomain(outing))
+        backup?.markStale()
     }
 }

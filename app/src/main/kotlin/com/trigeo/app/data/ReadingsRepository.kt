@@ -12,6 +12,7 @@ import java.util.UUID
 
 class ReadingsRepository(
     private val dao: ReadingDao,
+    private val backup: BackupNotifier? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val idFactory: () -> UUID = UUID::randomUUID,
 ) {
@@ -42,11 +43,13 @@ class ReadingsRepository(
             createdAt = clock.instant(),
         )
         dao.upsert(ReadingEntity.fromDomain(reading))
+        backup?.markStale()
         return reading
     }
 
     suspend fun update(reading: Reading) {
         dao.upsert(ReadingEntity.fromDomain(reading))
+        backup?.markStale()
     }
 
     suspend fun insertImported(
@@ -77,6 +80,7 @@ class ReadingsRepository(
             createdAt = createdAt,
         )
         dao.upsert(ReadingEntity.fromDomain(reading))
+        backup?.markStale()
         return InsertOutcome.Inserted(reading)
     }
 
@@ -87,13 +91,16 @@ class ReadingsRepository(
 
     suspend fun setVisible(id: UUID, visible: Boolean) {
         dao.setVisible(id.toString(), visible)
+        backup?.markStale()
     }
 
     suspend fun rename(id: UUID, newName: String?) {
         dao.rename(id.toString(), newName?.takeIf { it.isNotBlank() })
+        backup?.markStale()
     }
 
     suspend fun delete(id: UUID) {
         dao.delete(id.toString())
+        backup?.markStale()
     }
 }

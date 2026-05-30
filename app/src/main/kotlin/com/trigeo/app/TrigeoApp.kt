@@ -1,6 +1,7 @@
 package com.trigeo.app
 
 import android.app.Application
+import com.trigeo.app.data.BackupNotifier
 import com.trigeo.app.data.OfflineRegionsRepository
 import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
@@ -36,8 +37,13 @@ class TrigeoApp : Application() {
     }
 
     val database: TrigeoDatabase by lazy { TrigeoDatabase.get(this) }
-    val outingsRepository: OutingsRepository by lazy { OutingsRepository(database.outingDao()) }
-    val readingsRepository: ReadingsRepository by lazy { ReadingsRepository(database.readingDao()) }
+    val backupNotifier: BackupNotifier by lazy { BackupNotifier(this) }
+    val outingsRepository: OutingsRepository by lazy {
+        OutingsRepository(database.outingDao(), backupNotifier)
+    }
+    val readingsRepository: ReadingsRepository by lazy {
+        ReadingsRepository(database.readingDao(), backupNotifier)
+    }
     val settingsRepository: SettingsRepository by lazy { SettingsRepository(this) }
     val offlineRegionsRepository: OfflineRegionsRepository by lazy { OfflineRegionsRepository(this) }
     val locationService: LocationService by lazy { LocationService(this) }
