@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,10 +42,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.ReadingDirection
@@ -386,9 +391,14 @@ internal fun NumberEditDialog(
     onDismiss: () -> Unit,
     onConfirm: (Float) -> Unit,
 ) {
-    var text by remember { mutableStateOf("%.0f".format(current)) }
-    val parsed = text.replace(',', '.').toFloatOrNull()
+    var text by remember {
+        val initial = "%.0f".format(current)
+        mutableStateOf(TextFieldValue(text = initial, selection = TextRange(0, initial.length)))
+    }
+    val parsed = text.text.replace(',', '.').toFloatOrNull()
     val valid = parsed != null && parsed in range
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -401,6 +411,7 @@ internal fun NumberEditDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     suffix = { Text(suffix.trim()) },
                     isError = !valid,
+                    modifier = Modifier.focusRequester(focusRequester),
                 )
                 Text(
                     "Range: %.0f to %.0f$suffix".format(range.start, range.endInclusive),
