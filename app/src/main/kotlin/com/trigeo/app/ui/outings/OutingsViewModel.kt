@@ -7,6 +7,7 @@ import com.trigeo.app.data.OutingsRepository
 import com.trigeo.app.data.ReadingsRepository
 import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.domain.Outing
+import com.trigeo.app.domain.Reading
 import com.trigeo.app.io.OutingShareCodec
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,36 @@ class OutingsViewModel(
 
     fun delete(id: UUID) {
         viewModelScope.launch { repo.delete(id) }
+    }
+
+    data class DeletedOuting(val outing: Outing, val readings: List<Reading>)
+
+    fun deleteWithUndo(id: UUID, onPrepared: (DeletedOuting) -> Unit) {
+        viewModelScope.launch {
+            val outing = repo.get(id) ?: return@launch
+            val readings = readingsRepo.observeByOuting(id).first()
+            repo.delete(id)
+            onPrepared(DeletedOuting(outing, readings))
+        }
+    }
+
+    fun restore(deleted: DeletedOuting) {
+        viewModelScope.launch {
+            repo.restore(deleted.outing)
+            deleted.readings.forEach { r ->
+                readingsRepo.insertImported(
+                    outingId = r.outingId,
+                    readingId = r.id,
+                    name = r.name,
+                    point = r.point,
+                    bearing = r.bearing,
+                    startBearingDeg = r.startBearingDeg,
+                    stopBearingDeg = r.stopBearingDeg,
+                    direction = r.direction,
+                    createdAt = r.createdAt,
+                )
+            }
+        }
     }
 
     fun shareText(outingId: UUID, onReady: (String) -> Unit) {

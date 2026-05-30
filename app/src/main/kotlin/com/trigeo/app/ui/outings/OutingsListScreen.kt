@@ -34,6 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -43,7 +47,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -73,7 +79,10 @@ fun OutingsListScreen(
     var showImport by remember { mutableStateOf(false) }
     var manageTarget by remember { mutableStateOf<Outing?>(null) }
     var renameTarget by remember { mutableStateOf<Outing?>(null) }
+    var deleteConfirmTarget by remember { mutableStateOf<Outing?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -131,6 +140,7 @@ fun OutingsListScreen(
                 text = { Text("New outing") },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize()) {
             if (outings.isEmpty()) {
@@ -227,8 +237,46 @@ fun OutingsListScreen(
                 }
             },
             onDelete = {
-                viewModel.delete(target.id)
+                deleteConfirmTarget = target
                 manageTarget = null
+            },
+        )
+    }
+
+    deleteConfirmTarget?.let { target ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { deleteConfirmTarget = null },
+            title = { Text("Delete outing?") },
+            text = {
+                Text("\"${target.displayName}\" and all its readings will be deleted.")
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        deleteConfirmTarget = null
+                        viewModel.deleteWithUndo(target.id) { deleted ->
+                            scope.launch {
+                                val result = snackbarHostState.showSnackbar(
+                                    message = "Outing deleted",
+                                    actionLabel = "Undo",
+                                    withDismissAction = true,
+                                    duration = SnackbarDuration.Long,
+                                )
+                                if (result == SnackbarResult.ActionPerformed) {
+                                    viewModel.restore(deleted)
+                                }
+                            }
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { deleteConfirmTarget = null },
+                ) { Text("Cancel") }
             },
         )
     }

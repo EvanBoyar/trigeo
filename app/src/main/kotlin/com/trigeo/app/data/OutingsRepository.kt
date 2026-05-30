@@ -34,4 +34,8 @@ class OutingsRepository(
     suspend fun delete(id: UUID) {
         dao.delete(id.toString())
     }
+
+    suspend fun restore(outing: Outing) {
+        dao.upsert(OutingEntity.fromDomain(outing))
+    }
 }
