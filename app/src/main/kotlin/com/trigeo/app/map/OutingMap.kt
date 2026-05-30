@@ -99,6 +99,13 @@ private const val LYR_FIX_ELLIPSE_LINE = "trigeo-fix-ellipse-line-lyr"
 private const val SRC_PENDING = "trigeo-pending-point"
 private const val LYR_PENDING = "trigeo-pending-point-lyr"
 
+private const val SRC_PENDING_QUICK_CONE = "trigeo-pending-quick-cone"
+private const val SRC_PENDING_QUICK_LINES = "trigeo-pending-quick-lines"
+private const val SRC_PENDING_QUICK_POINT = "trigeo-pending-quick-point"
+private const val LYR_PENDING_QUICK_CONE = "trigeo-pending-quick-cone-lyr"
+private const val LYR_PENDING_QUICK_LINES = "trigeo-pending-quick-lines-lyr"
+private const val LYR_PENDING_QUICK_POINT = "trigeo-pending-quick-point-lyr"
+
 private const val SRC_GPS_ACCURACY = "trigeo-gps-accuracy"
 private const val LYR_GPS_ACCURACY = "trigeo-gps-accuracy-lyr"
 
@@ -125,6 +132,10 @@ fun OutingMap(
     tileStyle: MapTileStyle,
     fix: TriangulationFix?,
     pendingPoint: GeoPoint?,
+    pendingQuickStartPoint: GeoPoint? = null,
+    pendingQuickStartBearingDeg: Double? = null,
+    pendingQuickStartDirection: ReadingDirection = ReadingDirection.NORMAL,
+    showLiveCone: Boolean = true,
     bearingDeg: Double,
     rotationEnabled: Boolean,
     boundsHolder: MapBoundsHolder,
@@ -227,9 +238,9 @@ fun OutingMap(
         pushOverlayData(style, readings)
     }
 
-    LaunchedEffect(liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection, styleRef) {
+    LaunchedEffect(liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection, showLiveCone, styleRef) {
         val style = styleRef ?: return@LaunchedEffect
-        pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection)
+        pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection, showLiveCone)
     }
 
     LaunchedEffect(liveLocation, liveAccuracyMeters, styleRef) {
@@ -245,6 +256,23 @@ fun OutingMap(
     LaunchedEffect(pendingPoint, styleRef) {
         val style = styleRef ?: return@LaunchedEffect
         pushPendingData(style, pendingPoint)
+    }
+
+    LaunchedEffect(
+        pendingQuickStartPoint,
+        pendingQuickStartBearingDeg,
+        pendingQuickStartDirection,
+        liveBearingDeg,
+        styleRef,
+    ) {
+        val style = styleRef ?: return@LaunchedEffect
+        pushPendingQuickStartData(
+            style,
+            pendingQuickStartPoint,
+            pendingQuickStartBearingDeg,
+            liveBearingDeg,
+            pendingQuickStartDirection,
+        )
     }
 
     LaunchedEffect(cameraRequest, mapRef) {
@@ -296,6 +324,9 @@ private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_FIX_ELLIPSE))
     style.addSource(GeoJsonSource(SRC_FIX_POINT))
     style.addSource(GeoJsonSource(SRC_PENDING))
+    style.addSource(GeoJsonSource(SRC_PENDING_QUICK_CONE))
+    style.addSource(GeoJsonSource(SRC_PENDING_QUICK_LINES))
+    style.addSource(GeoJsonSource(SRC_PENDING_QUICK_POINT))
     style.addSource(GeoJsonSource(SRC_GPS_ACCURACY))
 
     style.addLayer(
@@ -304,6 +335,37 @@ private fun addOverlayLayers(style: Style) {
             fillOpacity(0.10f),
         ),
     )
+    // Captured (saved) readings sit underneath the active live and pending overlays so
+    // active capture geometry stays visible even when it overlaps prior readings.
+    style.addLayer(
+        FillLayer(LYR_CONES, SRC_CONES).withProperties(
+            fillColor("#5598D8"),
+            fillOpacity(0.28f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_CONES_OUTLINE, SRC_CONES).withProperties(
+            lineColor("#5598D8"),
+            lineWidth(1.5f),
+            lineOpacity(0.85f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LINES_PHANTOM, SRC_LINES_PHANTOM).withProperties(
+            lineColor(COLOR_PHANTOM_BEARING),
+            lineWidth(3.5f),
+            lineOpacity(0.75f),
+            lineDasharray(arrayOf(2.5f, 2.5f)),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LINES_SOLID, SRC_LINES_SOLID).withProperties(
+            lineColor(COLOR_CAPTURED_BEARING),
+            lineWidth(3.5f),
+            lineOpacity(0.95f),
+        ),
+    )
+    // Live (single-capture) overlay above captured readings.
     style.addLayer(
         FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
             fillColor("#F2C94C"),
@@ -331,34 +393,6 @@ private fun addOverlayLayers(style: Style) {
             lineWidth(3f),
             lineOpacity(0.85f),
             lineDasharray(arrayOf(3f, 3f)),
-        ),
-    )
-    style.addLayer(
-        FillLayer(LYR_CONES, SRC_CONES).withProperties(
-            fillColor("#2A6EA8"),
-            fillOpacity(0.28f),
-        ),
-    )
-    style.addLayer(
-        LineLayer(LYR_CONES_OUTLINE, SRC_CONES).withProperties(
-            lineColor("#2A6EA8"),
-            lineWidth(1.5f),
-            lineOpacity(0.85f),
-        ),
-    )
-    style.addLayer(
-        LineLayer(LYR_LINES_PHANTOM, SRC_LINES_PHANTOM).withProperties(
-            lineColor(COLOR_PHANTOM_BEARING),
-            lineWidth(3.5f),
-            lineOpacity(0.75f),
-            lineDasharray(arrayOf(2.5f, 2.5f)),
-        ),
-    )
-    style.addLayer(
-        LineLayer(LYR_LINES_SOLID, SRC_LINES_SOLID).withProperties(
-            lineColor(COLOR_CAPTURED_BEARING),
-            lineWidth(3.5f),
-            lineOpacity(0.95f),
         ),
     )
     style.addLayer(
@@ -410,6 +444,27 @@ private fun addOverlayLayers(style: Style) {
             circleStrokeWidth(3f),
         ),
     )
+    style.addLayer(
+        FillLayer(LYR_PENDING_QUICK_CONE, SRC_PENDING_QUICK_CONE).withProperties(
+            fillColor("#F2C94C"),
+            fillOpacity(0.32f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_PENDING_QUICK_LINES, SRC_PENDING_QUICK_LINES).withProperties(
+            lineColor("#B45309"),
+            lineWidth(3f),
+            lineOpacity(0.95f),
+        ),
+    )
+    style.addLayer(
+        CircleLayer(LYR_PENDING_QUICK_POINT, SRC_PENDING_QUICK_POINT).withProperties(
+            circleRadius(7f),
+            circleColor("#B45309"),
+            circleStrokeColor("#FFFFFF"),
+            circleStrokeWidth(2f),
+        ),
+    )
 }
 
 private fun pushGpsAccuracyData(
@@ -447,6 +502,40 @@ private fun pushPendingData(style: Style, point: GeoPoint?) {
             ),
         )
     }
+}
+
+private fun pushPendingQuickStartData(
+    style: Style,
+    startPoint: GeoPoint?,
+    startBearingDeg: Double?,
+    currentBearingDeg: Double?,
+    direction: ReadingDirection,
+) {
+    val coneSrc = style.getSource(SRC_PENDING_QUICK_CONE) as? GeoJsonSource
+    val linesSrc = style.getSource(SRC_PENDING_QUICK_LINES) as? GeoJsonSource
+    val pointSrc = style.getSource(SRC_PENDING_QUICK_POINT) as? GeoJsonSource
+    if (startPoint == null || startBearingDeg == null) {
+        coneSrc?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        linesSrc?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        pointSrc?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        return
+    }
+    pointSrc?.setGeoJson(
+        FeatureCollection.fromFeatures(
+            listOf(Feature.fromGeometry(Point.fromLngLat(startPoint.longitude, startPoint.latitude))),
+        ),
+    )
+    val lineFeatures = mutableListOf<Feature>()
+    lineFeatures += buildBearingLines(startPoint, startBearingDeg, direction)
+    if (currentBearingDeg != null) {
+        lineFeatures += buildBearingLines(startPoint, currentBearingDeg, direction)
+        val bc = com.trigeo.app.domain.BearingCapture.fromStartStop(startBearingDeg, currentBearingDeg)
+        val cones = buildConePolygons(startPoint, bc.centerDeg, bc.halfWidthDeg, direction)
+        coneSrc?.setGeoJson(FeatureCollection.fromFeatures(cones))
+    } else {
+        coneSrc?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    }
+    linesSrc?.setGeoJson(FeatureCollection.fromFeatures(lineFeatures))
 }
 
 private fun pushFixData(style: Style, fix: TriangulationFix?) {
@@ -536,6 +625,7 @@ private fun pushLiveData(
     bearingDeg: Double?,
     uncertaintyDeg: Double,
     direction: ReadingDirection,
+    showCone: Boolean,
 ) {
     val pointSource = style.getSource(SRC_LIVE_POINT) as? GeoJsonSource
     val lineSource = style.getSource(SRC_LIVE_LINE) as? GeoJsonSource
@@ -575,8 +665,12 @@ private fun pushLiveData(
     }
     phantomLineSource?.setGeoJson(FeatureCollection.fromFeatures(phantomLines))
 
-    val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, direction)
-    coneSource?.setGeoJson(FeatureCollection.fromFeatures(cones))
+    if (showCone) {
+        val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, direction)
+        coneSource?.setGeoJson(FeatureCollection.fromFeatures(cones))
+    } else {
+        coneSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    }
 }
 
 private fun makeDotBitmap(

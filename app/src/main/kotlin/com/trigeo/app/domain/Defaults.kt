@@ -1,7 +1,9 @@
 package com.trigeo.app.domain
 
 object Defaults {
-    const val UNCERTAINTY_DEG: Double = 5.0
+    const val UNCERTAINTY_DEG: Double = 20.0
+    const val UNCERTAINTY_MIN_DEG: Double = 1.0
+    const val UNCERTAINTY_MAX_DEG: Double = 80.0
     const val BEARING_LINE_METERS: Double = 500_000.0
 
     /**

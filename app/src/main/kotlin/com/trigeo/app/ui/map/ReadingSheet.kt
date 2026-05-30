@@ -25,7 +25,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +46,8 @@ import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.geo.Angles
 import com.trigeo.app.sensors.CompassAccuracy
 import com.trigeo.app.sensors.CompassReading
+import com.trigeo.app.ui.settings.EditableValueLabel
+import com.trigeo.app.ui.settings.SliderWithDefaultTick
 
 enum class BearingMode { COMPASS, START_STOP, CUSTOM }
 
@@ -126,6 +127,7 @@ fun ReadingDraft.toReadingValues(
 fun ReadingPanel(
     title: String,
     initial: ReadingDraft,
+    defaultUncertaintyDeg: Float,
     capturedAtUtc: String? = null,
     locationPermissionGranted: Boolean,
     onRequestPermission: () -> Unit,
@@ -181,6 +183,7 @@ fun ReadingPanel(
             if (draft.bearingMode != BearingMode.START_STOP) {
                 UncertaintyCard(
                     value = draft.uncertaintyDeg,
+                    defaultValue = defaultUncertaintyDeg,
                     onChange = { draft = draft.copy(uncertaintyDeg = it) },
                 )
             }
@@ -552,24 +555,30 @@ private fun DirectionOption(
 @Composable
 private fun UncertaintyCard(
     value: Float,
+    defaultValue: Float,
     onChange: (Float) -> Unit,
 ) {
+    val range = Defaults.UNCERTAINTY_MIN_DEG.toFloat()..Defaults.UNCERTAINTY_MAX_DEG.toFloat()
     Card(shape = RoundedCornerShape(20.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Uncertainty", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
-                Text(
-                    "%.0f°".format(value),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontFamily = FontFamily.Monospace,
+                EditableValueLabel(
+                    label = "%.0f°".format(value),
+                    title = "Uncertainty",
+                    current = value,
+                    range = range,
+                    suffix = "°",
+                    onChange = onChange,
                 )
             }
-            Slider(
+            SliderWithDefaultTick(
                 value = value,
                 onValueChange = onChange,
-                valueRange = 1f..30f,
-                steps = 28,
+                valueRange = range,
+                steps = (Defaults.UNCERTAINTY_MAX_DEG - Defaults.UNCERTAINTY_MIN_DEG).toInt() - 1,
+                defaultValue = defaultValue,
             )
         }
     }

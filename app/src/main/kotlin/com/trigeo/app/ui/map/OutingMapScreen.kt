@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -95,6 +96,8 @@ fun OutingMapScreen(
     val defaultDirection by viewModel.defaultDirection.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
+    val defaultStartStopMode by viewModel.defaultStartStopMode.collectAsState()
+    val pendingQuickStart by viewModel.pendingQuickStart.collectAsState()
     val tileStyle by viewModel.tileStyle.collectAsState()
 
     val permission = rememberLocationPermission()
@@ -241,45 +244,86 @@ fun OutingMapScreen(
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Add reading with options")
                     }
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            if (!permission.granted) {
-                                permission.request()
-                                return@ExtendedFloatingActionButton
+                    val isPendingStop = pendingQuickStart != null
+                    val fabLabel = when {
+                        isPendingStop -> "Stop bearing"
+                        defaultStartStopMode -> "Start bearing"
+                        else -> "Quick add"
+                    }
+                    val fabIcon = if (isPendingStop) Icons.Filled.Stop else Icons.Filled.Bolt
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (isPendingStop) {
+                            SmallFloatingActionButton(
+                                onClick = { viewModel.cancelQuickCapture() },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Cancel start bearing")
                             }
-                            if (!quickReady) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(quickBlockedReason!!)
+                        }
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                if (!permission.granted) {
+                                    permission.request()
+                                    return@ExtendedFloatingActionButton
                                 }
-                                return@ExtendedFloatingActionButton
-                            }
-                            viewModel.quickCreateReading { created ->
-                                scope.launch {
-                                    val result = snackbarHostState.showSnackbar(
-                                        message = "Reading added",
-                                        actionLabel = "Undo",
-                                        withDismissAction = true,
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        viewModel.deleteReading(created.id)
+                                if (!quickReady) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(quickBlockedReason!!)
+                                    }
+                                    return@ExtendedFloatingActionButton
+                                }
+                                if (defaultStartStopMode) {
+                                    if (isPendingStop) {
+                                        viewModel.completeQuickCapture { created ->
+                                            scope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Reading added",
+                                                    actionLabel = "Undo",
+                                                    withDismissAction = true,
+                                                    duration = SnackbarDuration.Short,
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    viewModel.deleteReading(created.id)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        viewModel.startQuickCapture()
+                                    }
+                                } else {
+                                    viewModel.quickCreateReading { created ->
+                                        scope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = "Reading added",
+                                                actionLabel = "Undo",
+                                                withDismissAction = true,
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                viewModel.deleteReading(created.id)
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        icon = { Icon(Icons.Filled.Bolt, contentDescription = null) },
-                        text = { Text("Quick add") },
-                        containerColor = if (quickReady) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        contentColor = if (quickReady) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
+                            },
+                            icon = { Icon(fabIcon, contentDescription = null) },
+                            text = { Text(fabLabel) },
+                            containerColor = when {
+                                isPendingStop -> MaterialTheme.colorScheme.tertiaryContainer
+                                quickReady -> MaterialTheme.colorScheme.primaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            contentColor = when {
+                                isPendingStop -> MaterialTheme.colorScheme.onTertiaryContainer
+                                quickReady -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
                 }
             }
         },
@@ -297,6 +341,10 @@ fun OutingMapScreen(
                     tileStyle = tileStyle,
                     fix = fix,
                     pendingPoint = if (showCapture) longPressPoint else null,
+                    pendingQuickStartPoint = pendingQuickStart?.point,
+                    pendingQuickStartBearingDeg = pendingQuickStart?.startBearingDeg,
+                    pendingQuickStartDirection = defaultDirection,
+                    showLiveCone = !defaultStartStopMode,
                     bearingDeg = mapBearing,
                     rotationEnabled = !lockToCompass,
                     boundsHolder = boundsHolder,
@@ -409,7 +457,10 @@ fun OutingMapScreen(
                         useGps = longPressPoint == null,
                         manualLat = longPressPoint?.latitude?.let { "%.6f".format(it) }.orEmpty(),
                         manualLon = longPressPoint?.longitude?.let { "%.6f".format(it) }.orEmpty(),
+                        bearingMode = if (defaultStartStopMode) BearingMode.START_STOP
+                        else BearingMode.COMPASS,
                     ),
+                    defaultUncertaintyDeg = defaultUncertaintyDeg,
                     locationPermissionGranted = permission.granted,
                     onRequestPermission = permission.request,
                     liveLocation = liveLocation,
@@ -436,6 +487,7 @@ fun OutingMapScreen(
                 val hasStartStop = reading.startBearingDeg != null && reading.stopBearingDeg != null
                 ReadingPanel(
                     title = "Edit reading",
+                    defaultUncertaintyDeg = defaultUncertaintyDeg,
                     capturedAtUtc = reading.createdAtUtc,
                     initial = ReadingDraft(
                         name = reading.name.orEmpty(),

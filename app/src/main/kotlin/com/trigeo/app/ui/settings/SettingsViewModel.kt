@@ -43,6 +43,13 @@ class SettingsViewModel(
         viewModelScope.launch { repo.setTipButtonEnabled(value) }
     }
 
+    val defaultStartStopMode: StateFlow<Boolean> = repo.defaultStartStopMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setDefaultStartStopMode(value: Boolean) {
+        viewModelScope.launch { repo.setDefaultStartStopMode(value) }
+    }
+
     val minFixRangeMeters: StateFlow<Float> = repo.minFixRangeMeters
         .stateIn(
             viewModelScope,

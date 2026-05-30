@@ -1,7 +1,11 @@
 package com.trigeo.app.ui.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,30 +13,40 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.trigeo.app.domain.Defaults
 import com.trigeo.app.domain.ReadingDirection
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +60,7 @@ fun SettingsScreen(
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
     val tipButtonEnabled by viewModel.tipButtonEnabled.collectAsState()
+    val defaultStartStopMode by viewModel.defaultStartStopMode.collectAsState()
     val offlineRegions by viewModel.offlineRegions.collectAsState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -67,7 +82,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             DirectionCard(
@@ -80,8 +96,11 @@ fun SettingsScreen(
                 subtitle = "Starting half-cone width for new readings. Per-reading values can still be set in the capture panel.",
                 value = defaultUncertaintyDeg,
                 valueLabel = "%.0f°".format(defaultUncertaintyDeg),
-                valueRange = 1f..30f,
-                steps = 28,
+                valueRange = Defaults.UNCERTAINTY_MIN_DEG.toFloat()..Defaults.UNCERTAINTY_MAX_DEG.toFloat(),
+                steps = (Defaults.UNCERTAINTY_MAX_DEG - Defaults.UNCERTAINTY_MIN_DEG).toInt() - 1,
+                defaultValue = Defaults.UNCERTAINTY_DEG.toFloat(),
+                editTitle = "Default uncertainty",
+                editSuffix = "°",
                 onChange = viewModel::setDefaultUncertaintyDeg,
             )
             SliderRow(
@@ -91,7 +110,16 @@ fun SettingsScreen(
                 valueLabel = "%.0f m".format(minFixRangeMeters),
                 valueRange = 5f..50f,
                 steps = 8,
+                defaultValue = Defaults.MIN_FIX_RANGE_METERS.toFloat(),
+                editTitle = "Close-range floor",
+                editSuffix = " m",
                 onChange = viewModel::setMinFixRangeMeters,
+            )
+            SwitchRow(
+                title = "Start/stop quick capture",
+                subtitle = "When on, Quick add takes two taps: the first when the signal first appears, the second when it disappears. The Add reading panel also defaults to start/stop.",
+                checked = defaultStartStopMode,
+                onChange = viewModel::setDefaultStartStopMode,
             )
             OfflineRegionsCard(
                 regions = offlineRegions,
@@ -267,13 +295,16 @@ private fun SwitchRow(
 }
 
 @Composable
-private fun SliderRow(
+internal fun SliderRow(
     title: String,
     subtitle: String,
     value: Float,
     valueLabel: String,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
+    defaultValue: Float?,
+    editTitle: String,
+    editSuffix: String,
     onChange: (Float) -> Unit,
 ) {
     Card(shape = RoundedCornerShape(20.dp)) {
@@ -291,19 +322,138 @@ private fun SliderRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    valueLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontFamily = FontFamily.Monospace,
+                EditableValueLabel(
+                    label = valueLabel,
+                    title = editTitle,
+                    current = value,
+                    range = valueRange,
+                    suffix = editSuffix,
+                    onChange = onChange,
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Slider(
+            SliderWithDefaultTick(
                 value = value,
                 onValueChange = onChange,
                 valueRange = valueRange,
                 steps = steps,
+                defaultValue = defaultValue,
             )
+        }
+    }
+}
+
+@Composable
+internal fun EditableValueLabel(
+    label: String,
+    title: String,
+    current: Float,
+    range: ClosedFloatingPointRange<Float>,
+    suffix: String,
+    onChange: (Float) -> Unit,
+) {
+    var editing by remember { mutableStateOf(false) }
+    Text(
+        label,
+        style = MaterialTheme.typography.titleMedium,
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .clickable { editing = true }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+    if (editing) {
+        NumberEditDialog(
+            title = title,
+            current = current,
+            range = range,
+            suffix = suffix,
+            onDismiss = { editing = false },
+            onConfirm = {
+                onChange(it)
+                editing = false
+            },
+        )
+    }
+}
+
+@Composable
+internal fun NumberEditDialog(
+    title: String,
+    current: Float,
+    range: ClosedFloatingPointRange<Float>,
+    suffix: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Float) -> Unit,
+) {
+    var text by remember { mutableStateOf("%.0f".format(current)) }
+    val parsed = text.replace(',', '.').toFloatOrNull()
+    val valid = parsed != null && parsed in range
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    suffix = { Text(suffix.trim()) },
+                    isError = !valid,
+                )
+                Text(
+                    "Range: %.0f to %.0f$suffix".format(range.start, range.endInclusive),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (valid) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = valid,
+                onClick = { parsed?.let(onConfirm) },
+            ) { Text("Set") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+internal fun SliderWithDefaultTick(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    defaultValue: Float?,
+) {
+    val tickColor = MaterialTheme.colorScheme.primary
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+        )
+        if (defaultValue != null && defaultValue in valueRange) {
+            val span = valueRange.endInclusive - valueRange.start
+            val fraction = if (span > 0f) (defaultValue - valueRange.start) / span else 0f
+            Canvas(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 2.dp),
+            ) {
+                val x = fraction * size.width
+                val y = size.height / 2f
+                drawCircle(
+                    color = tickColor,
+                    radius = 3.5.dp.toPx(),
+                    center = Offset(x, y),
+                )
+            }
         }
     }
 }

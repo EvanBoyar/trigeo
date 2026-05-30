@@ -49,11 +49,16 @@ class SettingsRepository(context: Context) {
     val defaultUncertaintyDeg: Flow<Float> =
         store.data.map { prefs ->
             (prefs[KEY_DEFAULT_UNCERTAINTY] ?: Defaults.UNCERTAINTY_DEG.toFloat())
-                .coerceIn(1f, 30f)
+                .coerceIn(Defaults.UNCERTAINTY_MIN_DEG.toFloat(), Defaults.UNCERTAINTY_MAX_DEG.toFloat())
         }
 
     suspend fun setDefaultUncertaintyDeg(value: Float) {
-        store.edit { it[KEY_DEFAULT_UNCERTAINTY] = value.coerceIn(1f, 30f) }
+        store.edit {
+            it[KEY_DEFAULT_UNCERTAINTY] = value.coerceIn(
+                Defaults.UNCERTAINTY_MIN_DEG.toFloat(),
+                Defaults.UNCERTAINTY_MAX_DEG.toFloat(),
+            )
+        }
     }
 
     val tipButtonEnabled: Flow<Boolean> =
@@ -61,6 +66,13 @@ class SettingsRepository(context: Context) {
 
     suspend fun setTipButtonEnabled(value: Boolean) {
         store.edit { it[KEY_TIP_BUTTON_ENABLED] = value }
+    }
+
+    val defaultStartStopMode: Flow<Boolean> =
+        store.data.map { it[KEY_DEFAULT_START_STOP] ?: false }
+
+    suspend fun setDefaultStartStopMode(value: Boolean) {
+        store.edit { it[KEY_DEFAULT_START_STOP] = value }
     }
 
     val minFixRangeMeters: Flow<Float> =
@@ -83,5 +95,6 @@ class SettingsRepository(context: Context) {
         val KEY_DEFAULT_UNCERTAINTY = floatPreferencesKey("default_uncertainty_deg")
         val KEY_TIP_BUTTON_ENABLED = booleanPreferencesKey("tip_button_enabled")
         val KEY_MIN_FIX_RANGE = floatPreferencesKey("min_fix_range_meters")
+        val KEY_DEFAULT_START_STOP = booleanPreferencesKey("default_start_stop_mode")
     }
 }

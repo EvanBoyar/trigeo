@@ -31,6 +31,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+data class PendingQuickStart(
+    val point: GeoPoint,
+    val startBearingDeg: Double,
+)
+
 class OutingMapViewModel(
     private val outingsRepo: OutingsRepository,
     private val readingsRepo: ReadingsRepository,
@@ -66,6 +71,12 @@ class OutingMapViewModel(
             SharingStarted.WhileSubscribed(5_000),
             com.trigeo.app.domain.Defaults.MIN_FIX_RANGE_METERS.toFloat(),
         )
+
+    val defaultStartStopMode: StateFlow<Boolean> = settingsRepo.defaultStartStopMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _pendingQuickStart = MutableStateFlow<PendingQuickStart?>(null)
+    val pendingQuickStart: StateFlow<PendingQuickStart?> = _pendingQuickStart.asStateFlow()
 
     fun setTileStyle(value: MapTileStyle) {
         viewModelScope.launch { settingsRepo.setTileStyle(value) }
@@ -152,6 +163,39 @@ class OutingMapViewModel(
             )
             onCreated(created)
         }
+    }
+
+    fun startQuickCapture() {
+        val loc = liveLocation.value ?: return
+        val compass = liveCompass.value ?: return
+        _pendingQuickStart.value = PendingQuickStart(
+            point = GeoPoint(loc.latitude, loc.longitude),
+            startBearingDeg = compass.trueDeg,
+        )
+    }
+
+    fun completeQuickCapture(onCreated: (Reading) -> Unit) {
+        val pending = _pendingQuickStart.value ?: return
+        val compass = liveCompass.value ?: return
+        val bearing = BearingCapture.fromStartStop(pending.startBearingDeg, compass.trueDeg)
+        val direction = defaultDirection.value
+        _pendingQuickStart.value = null
+        viewModelScope.launch {
+            val created = readingsRepo.create(
+                outingId = outingId,
+                point = pending.point,
+                bearing = bearing,
+                startBearingDeg = pending.startBearingDeg,
+                stopBearingDeg = compass.trueDeg,
+                direction = direction,
+                name = null,
+            )
+            onCreated(created)
+        }
+    }
+
+    fun cancelQuickCapture() {
+        _pendingQuickStart.value = null
     }
 
     fun updateReading(reading: Reading) {
