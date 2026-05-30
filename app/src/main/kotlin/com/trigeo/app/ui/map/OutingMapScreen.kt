@@ -136,13 +136,15 @@ fun OutingMapScreen(
     var showPanel by remember { mutableStateOf(false) }
     var showLayers by remember { mutableStateOf(false) }
     var showFix by remember { mutableStateOf(true) }
+    var readingsOnMap by remember { mutableStateOf(true) }
     val panelOpen = showCapture || editTarget != null
 
     val boundsHolder = remember { MapBoundsHolder() }
     var downloadBounds by remember { mutableStateOf<org.maplibre.android.geometry.LatLngBounds?>(null) }
     val downloadProgress by viewModel.downloadProgress.collectAsState()
 
-    val visibleReadings = remember(readings) { readings.filter { it.visible } }
+    val mapReadings = if (readingsOnMap) readings else emptyList()
+    val visibleReadings = remember(mapReadings) { mapReadings.filter { it.visible } }
     val fix = remember(visibleReadings, showFix, minFixRangeMeters) {
         if (showFix) Triangulation.solve(visibleReadings, minFixRangeMeters.toDouble()) else null
     }
@@ -284,7 +286,7 @@ fun OutingMapScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                 OutingMap(
-                    readings = readings,
+                    readings = mapReadings,
                     cameraRequest = cameraRequest,
                     liveLocation = liveLocation?.let { GeoPoint(it.latitude, it.longitude) },
                     liveAccuracyMeters = liveLocation?.takeIf { it.hasAccuracy() }?.accuracy,
@@ -439,6 +441,8 @@ fun OutingMapScreen(
     if (showPanel) {
         ReadingsPanel(
             readings = readings,
+            readingsOnMap = readingsOnMap,
+            onToggleReadingsOnMap = { readingsOnMap = !readingsOnMap },
             onToggleVisible = { id, visible -> viewModel.setVisible(id, visible) },
             onEdit = { reading ->
                 showPanel = false

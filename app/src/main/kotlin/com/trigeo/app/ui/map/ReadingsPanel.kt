@@ -63,6 +63,8 @@ import kotlin.math.roundToInt
 @Composable
 fun ReadingsPanel(
     readings: List<Reading>,
+    readingsOnMap: Boolean,
+    onToggleReadingsOnMap: () -> Unit,
     onToggleVisible: (UUID, Boolean) -> Unit,
     onEdit: (Reading) -> Unit,
     onDelete: (Reading) -> Unit,
@@ -89,7 +91,38 @@ fun ReadingsPanel(
                     .padding(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Readings", style = MaterialTheme.typography.headlineSmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Readings",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (readings.isNotEmpty()) {
+                        FilledTonalButton(
+                            onClick = onToggleReadingsOnMap,
+                            colors = if (readingsOnMap) {
+                                ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            } else {
+                                ButtonDefaults.filledTonalButtonColors()
+                            },
+                        ) {
+                            Icon(
+                                if (readingsOnMap) Icons.Filled.Visibility
+                                else Icons.Filled.VisibilityOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.size(6.dp))
+                            Text(if (readingsOnMap) "On map" else "Hidden")
+                        }
+                    }
+                }
                 if (readings.isEmpty()) {
                     Text(
                         "No readings yet. Use the Add reading button on the map.",

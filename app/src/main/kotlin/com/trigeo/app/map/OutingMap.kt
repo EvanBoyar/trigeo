@@ -70,6 +70,7 @@ private const val LYR_POINTS = "trigeo-points-lyr"
 private const val LYR_LINES_SOLID = "trigeo-lines-solid-lyr"
 private const val LYR_LINES_PHANTOM = "trigeo-lines-phantom-lyr"
 private const val LYR_CONES = "trigeo-cones-lyr"
+private const val LYR_CONES_OUTLINE = "trigeo-cones-outline-lyr"
 private const val IMG_READING_DOT = "trigeo-reading-dot"
 private const val COLOR_CAPTURED_BEARING = "#000000"
 private const val COLOR_LIVE_BEARING = "#EF4444"
@@ -83,6 +84,7 @@ private const val LYR_LIVE_POINT = "trigeo-live-point-lyr"
 private const val LYR_LIVE_LINE = "trigeo-live-line-lyr"
 private const val LYR_LIVE_LINE_PHANTOM = "trigeo-live-line-phantom-lyr"
 private const val LYR_LIVE_CONE = "trigeo-live-cone-lyr"
+private const val LYR_LIVE_CONE_OUTLINE = "trigeo-live-cone-outline-lyr"
 private const val IMG_LIVE_DOT = "trigeo-live-dot"
 private const val IMG_LIVE_DOT_ARROW = "trigeo-live-dot-arrow"
 private const val PROP_BEARING = "bearing"
@@ -305,7 +307,14 @@ private fun addOverlayLayers(style: Style) {
     style.addLayer(
         FillLayer(LYR_LIVE_CONE, SRC_LIVE_CONE).withProperties(
             fillColor("#F2C94C"),
-            fillOpacity(0.12f),
+            fillOpacity(0.22f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LIVE_CONE_OUTLINE, SRC_LIVE_CONE).withProperties(
+            lineColor("#F2C94C"),
+            lineWidth(1.5f),
+            lineOpacity(0.6f),
         ),
     )
     style.addLayer(
@@ -326,8 +335,15 @@ private fun addOverlayLayers(style: Style) {
     )
     style.addLayer(
         FillLayer(LYR_CONES, SRC_CONES).withProperties(
-            fillColor("#F2C94C"),
-            fillOpacity(0.22f),
+            fillColor("#2A6EA8"),
+            fillOpacity(0.28f),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_CONES_OUTLINE, SRC_CONES).withProperties(
+            lineColor("#2A6EA8"),
+            lineWidth(1.5f),
+            lineOpacity(0.85f),
         ),
     )
     style.addLayer(
@@ -630,19 +646,23 @@ private fun effectiveBearings(centerDeg: Double, direction: ReadingDirection): L
             listOf(Angles.normalize(centerDeg), Angles.normalize(centerDeg + 180.0))
     }
 
+private const val LINE_GEODESIC_STEPS = 24
+private const val RADIAL_GEODESIC_STEPS = 24
+
 private fun buildBearingLines(
     origin: GeoPoint,
     centerDeg: Double,
     direction: ReadingDirection,
 ): List<Feature> {
-    val originPt = Point.fromLngLat(origin.longitude, origin.latitude)
     return effectiveBearings(centerDeg, direction).map { deg ->
-        val end = Geodesy.destination(origin, deg, Defaults.BEARING_LINE_METERS)
-        Feature.fromGeometry(
-            LineString.fromLngLats(
-                listOf(originPt, Point.fromLngLat(end.longitude, end.latitude)),
-            ),
-        )
+        val points = ArrayList<Point>(LINE_GEODESIC_STEPS + 1)
+        points.add(Point.fromLngLat(origin.longitude, origin.latitude))
+        for (i in 1..LINE_GEODESIC_STEPS) {
+            val d = Defaults.BEARING_LINE_METERS * (i.toDouble() / LINE_GEODESIC_STEPS)
+            val p = Geodesy.destination(origin, deg, d)
+            points.add(Point.fromLngLat(p.longitude, p.latitude))
+        }
+        Feature.fromGeometry(LineString.fromLngLats(points))
     }
 }
 
@@ -657,14 +677,30 @@ private fun buildConePolygons(
     }
 
 private fun buildConePolygon(origin: GeoPoint, centerDeg: Double, halfWidthDeg: Double): Feature {
-    val steps = 12
-    val ring = mutableListOf(Point.fromLngLat(origin.longitude, origin.latitude))
+    val rimSteps = 12
     val start = Angles.normalize(centerDeg - halfWidthDeg)
+    val end = Angles.normalize(centerDeg + halfWidthDeg)
     val span = halfWidthDeg * 2.0
-    for (i in 0..steps) {
-        val deg = start + span * (i.toDouble() / steps)
-        val e = Geodesy.destination(origin, deg, Defaults.BEARING_LINE_METERS)
-        ring.add(Point.fromLngLat(e.longitude, e.latitude))
+    val ring = ArrayList<Point>(2 * RADIAL_GEODESIC_STEPS + rimSteps + 2)
+    ring.add(Point.fromLngLat(origin.longitude, origin.latitude))
+    // Outward along the start radial as a great circle.
+    for (i in 1..RADIAL_GEODESIC_STEPS) {
+        val d = Defaults.BEARING_LINE_METERS * (i.toDouble() / RADIAL_GEODESIC_STEPS)
+        val p = Geodesy.destination(origin, start, d)
+        ring.add(Point.fromLngLat(p.longitude, p.latitude))
+    }
+    // Rim from start radial to end radial. Skip i = 0 and i = rimSteps because the
+    // adjacent radials already terminate at those rim points.
+    for (i in 1 until rimSteps) {
+        val deg = start + span * (i.toDouble() / rimSteps)
+        val p = Geodesy.destination(origin, deg, Defaults.BEARING_LINE_METERS)
+        ring.add(Point.fromLngLat(p.longitude, p.latitude))
+    }
+    // Inward along the end radial as a great circle.
+    for (i in RADIAL_GEODESIC_STEPS downTo 1) {
+        val d = Defaults.BEARING_LINE_METERS * (i.toDouble() / RADIAL_GEODESIC_STEPS)
+        val p = Geodesy.destination(origin, end, d)
+        ring.add(Point.fromLngLat(p.longitude, p.latitude))
     }
     ring.add(Point.fromLngLat(origin.longitude, origin.latitude))
     return Feature.fromGeometry(Polygon.fromLngLats(listOf(ring)))
