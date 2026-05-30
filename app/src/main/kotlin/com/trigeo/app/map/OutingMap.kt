@@ -136,6 +136,7 @@ fun OutingMap(
 
     var styleRef by remember { mutableStateOf<Style?>(null) }
     var mapRef by remember { mutableStateOf<MapLibreMap?>(null) }
+    var recenterToken by remember { mutableStateOf<Long?>(null) }
 
     val mapView = remember(context) {
         MapLibre.getInstance(context)
@@ -246,18 +247,28 @@ fun OutingMap(
 
     LaunchedEffect(cameraRequest, mapRef) {
         val map = mapRef ?: return@LaunchedEffect
-        cameraRequest?.let { req ->
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngZoom(
-                    LatLng(req.point.latitude, req.point.longitude),
-                    cameraZoom,
-                ),
-            )
-        }
+        val req = cameraRequest ?: return@LaunchedEffect
+        val myToken = req.token
+        recenterToken = myToken
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(req.point.latitude, req.point.longitude),
+                cameraZoom,
+            ),
+            object : MapLibreMap.CancelableCallback {
+                override fun onCancel() {
+                    if (recenterToken == myToken) recenterToken = null
+                }
+                override fun onFinish() {
+                    if (recenterToken == myToken) recenterToken = null
+                }
+            },
+        )
     }
 
-    LaunchedEffect(bearingDeg, mapRef) {
+    LaunchedEffect(bearingDeg, mapRef, recenterToken) {
         val map = mapRef ?: return@LaunchedEffect
+        if (recenterToken != null) return@LaunchedEffect
         val current = map.cameraPosition
         val next = CameraPosition.Builder(current).bearing(bearingDeg).build()
         map.animateCamera(CameraUpdateFactory.newCameraPosition(next), 200)
