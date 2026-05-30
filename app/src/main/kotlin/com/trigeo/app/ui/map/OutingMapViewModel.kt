@@ -47,8 +47,8 @@ class OutingMapViewModel(
     val readings: StateFlow<List<Reading>> = readingsRepo.observeByOuting(outingId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val defaultBidirectional: StateFlow<Boolean> = settingsRepo.defaultBidirectional
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val defaultDirection: StateFlow<ReadingDirection> = settingsRepo.defaultDirection
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReadingDirection.NORMAL)
 
     val defaultUncertaintyDeg: StateFlow<Float> = settingsRepo.defaultUncertaintyDeg
         .stateIn(
@@ -130,6 +130,27 @@ class OutingMapViewModel(
                 direction = direction,
                 name = name,
             )
+        }
+    }
+
+    fun quickCreateReading(onCreated: (Reading) -> Unit) {
+        val loc = liveLocation.value ?: return
+        val compass = liveCompass.value ?: return
+        val uncertainty = defaultUncertaintyDeg.value.toDouble()
+        val direction = defaultDirection.value
+        val point = GeoPoint(loc.latitude, loc.longitude)
+        val bearing = BearingCapture.fromCenter(compass.trueDeg, uncertainty)
+        viewModelScope.launch {
+            val created = readingsRepo.create(
+                outingId = outingId,
+                point = point,
+                bearing = bearing,
+                startBearingDeg = null,
+                stopBearingDeg = null,
+                direction = direction,
+                name = null,
+            )
+            onCreated(created)
         }
     }
 

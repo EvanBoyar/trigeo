@@ -1,5 +1,6 @@
 package com.trigeo.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.trigeo.app.domain.ReadingDirection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +42,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onAddRegion: () -> Unit,
 ) {
-    val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
+    val defaultDirection by viewModel.defaultDirection.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
     val tipButtonEnabled by viewModel.tipButtonEnabled.collectAsState()
@@ -67,11 +70,9 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SwitchRow(
-                title = "Default to bidirectional readings",
-                subtitle = "New readings start with the bidirectional toggle on. Useful for null-based antennas with a 180-degree ambiguity.",
-                checked = defaultBidirectional,
-                onChange = viewModel::setDefaultBidirectional,
+            DirectionCard(
+                direction = defaultDirection,
+                onChange = viewModel::setDefaultDirection,
             )
 
             SliderRow(
@@ -171,6 +172,71 @@ private fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
     if (bytes < 1024 * 1024) return "%.1f KB".format(bytes / 1024.0)
     return "%.1f MB".format(bytes / (1024.0 * 1024.0))
+}
+
+@Composable
+private fun DirectionCard(
+    direction: ReadingDirection,
+    onChange: (ReadingDirection) -> Unit,
+) {
+    Card(shape = RoundedCornerShape(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text("Default reading direction", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "How new readings are drawn and used. Reversed flips the bearing 180 degrees (e.g. navigating off a back null) while keeping the captured value.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            DirectionOption(
+                label = "Normal",
+                subtitle = "Forward only.",
+                selected = direction == ReadingDirection.NORMAL,
+                onClick = { onChange(ReadingDirection.NORMAL) },
+            )
+            DirectionOption(
+                label = "Bidirectional",
+                subtitle = "Both ways. For null antennas with a 180-degree ambiguity.",
+                selected = direction == ReadingDirection.BIDIRECTIONAL,
+                onClick = { onChange(ReadingDirection.BIDIRECTIONAL) },
+            )
+            DirectionOption(
+                label = "Reversed",
+                subtitle = "Opposite of the captured heading.",
+                selected = direction == ReadingDirection.REVERSED,
+                onClick = { onChange(ReadingDirection.REVERSED) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DirectionOption(
+    label: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Column(modifier = Modifier.padding(start = 4.dp)) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable

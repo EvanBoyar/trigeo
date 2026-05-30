@@ -80,7 +80,7 @@ fun OfflinePickerScreen(
                 liveAccuracyMeters = null,
                 liveBearingDeg = null,
                 liveUncertaintyDeg = 0.0,
-                liveBidirectional = false,
+                liveDirection = com.trigeo.app.domain.ReadingDirection.NORMAL,
                 tileStyle = tileStyle,
                 fix = null,
                 pendingPoint = null,

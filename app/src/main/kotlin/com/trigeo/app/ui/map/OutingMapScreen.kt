@@ -1,6 +1,7 @@
 package com.trigeo.app.ui.map
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Layers
@@ -33,6 +38,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -45,7 +54,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -55,6 +66,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.trigeo.app.domain.GeoPoint
 import com.trigeo.app.domain.Reading
+import com.trigeo.app.domain.ReadingDirection
 import com.trigeo.app.data.RegionProgress
 import com.trigeo.app.geo.Triangulation
 import com.trigeo.app.map.CameraRequest
@@ -78,12 +90,14 @@ fun OutingMapScreen(
     val liveLocation by viewModel.liveLocation.collectAsState()
     val liveCompass by viewModel.liveCompass.collectAsState()
     val compassAvailable = viewModel.compassAvailable
-    val defaultBidirectional by viewModel.defaultBidirectional.collectAsState()
+    val defaultDirection by viewModel.defaultDirection.collectAsState()
     val defaultUncertaintyDeg by viewModel.defaultUncertaintyDeg.collectAsState()
     val minFixRangeMeters by viewModel.minFixRangeMeters.collectAsState()
     val tileStyle by viewModel.tileStyle.collectAsState()
 
     val permission = rememberLocationPermission()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(permission.granted) {
         if (permission.granted) viewModel.startSensors()
@@ -133,6 +147,14 @@ fun OutingMapScreen(
         if (showFix) Triangulation.solve(visibleReadings, minFixRangeMeters.toDouble()) else null
     }
 
+    val quickBlockedReason: String? = when {
+        !compassAvailable -> "No compass on this device"
+        liveLocation == null -> "Waiting for GPS fix"
+        liveCompass == null -> "Waiting for compass"
+        else -> null
+    }
+    val quickReady = quickBlockedReason == null
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -144,6 +166,7 @@ fun OutingMapScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (!panelOpen) {
                 Column(
@@ -207,13 +230,52 @@ fun OutingMapScreen(
                     SmallFloatingActionButton(onClick = { showPanel = true }) {
                         Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Readings")
                     }
-                    ExtendedFloatingActionButton(
+                    SmallFloatingActionButton(
                         onClick = {
                             if (!permission.granted) permission.request()
                             showCapture = true
                         },
-                        icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        text = { Text("Add reading") },
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add reading with options")
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            if (!permission.granted) {
+                                permission.request()
+                                return@ExtendedFloatingActionButton
+                            }
+                            if (!quickReady) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(quickBlockedReason!!)
+                                }
+                                return@ExtendedFloatingActionButton
+                            }
+                            viewModel.quickCreateReading { created ->
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Reading added",
+                                        actionLabel = "Undo",
+                                        withDismissAction = true,
+                                        duration = SnackbarDuration.Short,
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.deleteReading(created.id)
+                                    }
+                                }
+                            }
+                        },
+                        icon = { Icon(Icons.Filled.Bolt, contentDescription = null) },
+                        text = { Text("Quick add") },
+                        containerColor = if (quickReady) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        contentColor = if (quickReady) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                     )
                 }
             }
@@ -228,7 +290,7 @@ fun OutingMapScreen(
                     liveAccuracyMeters = liveLocation?.takeIf { it.hasAccuracy() }?.accuracy,
                     liveBearingDeg = liveCompass?.trueDeg,
                     liveUncertaintyDeg = defaultUncertaintyDeg.toDouble(),
-                    liveBidirectional = defaultBidirectional,
+                    liveDirection = defaultDirection,
                     tileStyle = tileStyle,
                     fix = fix,
                     pendingPoint = if (showCapture) longPressPoint else null,
@@ -242,6 +304,18 @@ fun OutingMapScreen(
                         }
                     },
                     modifier = Modifier.fillMaxSize(),
+                )
+                CenterlineTick(
+                    pointingDown = true,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 4.dp),
+                )
+                CenterlineTick(
+                    pointingDown = false,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 4.dp),
                 )
                 Column(
                     modifier = Modifier
@@ -275,11 +349,7 @@ fun OutingMapScreen(
                 ReadingPanel(
                     title = if (longPressPoint != null) "Add reading at point" else "Add reading",
                     initial = ReadingDraft(
-                        direction = if (defaultBidirectional) {
-                            com.trigeo.app.domain.ReadingDirection.BIDIRECTIONAL
-                        } else {
-                            com.trigeo.app.domain.ReadingDirection.NORMAL
-                        },
+                        direction = defaultDirection,
                         uncertaintyDeg = defaultUncertaintyDeg,
                         useGps = longPressPoint == null,
                         manualLat = longPressPoint?.latitude?.let { "%.6f".format(it) }.orEmpty(),
@@ -374,6 +444,8 @@ fun OutingMapScreen(
                 showPanel = false
                 editTarget = reading
             },
+            onDelete = { reading -> viewModel.deleteReading(reading.id) },
+            onRestore = { reading -> viewModel.updateReading(reading) },
             onDismiss = { showPanel = false },
         )
     }
@@ -408,6 +480,30 @@ fun OutingMapScreen(
                 viewModel.clearDownloadProgress()
             },
         )
+    }
+}
+
+@Composable
+private fun CenterlineTick(
+    pointingDown: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier.size(width = 20.dp, height = 13.dp)) {
+        val path = Path().apply {
+            if (pointingDown) {
+                moveTo(0f, 0f)
+                lineTo(size.width, 0f)
+                lineTo(size.width / 2f, size.height)
+                close()
+            } else {
+                moveTo(0f, size.height)
+                lineTo(size.width, size.height)
+                lineTo(size.width / 2f, 0f)
+                close()
+            }
+        }
+        drawPath(path, Color(0xFFEF4444))
+        drawPath(path, Color.White, style = Stroke(width = 1.5.dp.toPx()))
     }
 }
 

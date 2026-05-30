@@ -27,8 +27,8 @@ android {
         applicationId = "com.trigeo.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.1.8"
+        versionCode = 9
+        versionName = "0.1.9"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

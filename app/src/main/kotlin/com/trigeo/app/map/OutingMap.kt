@@ -1,5 +1,10 @@
 package com.trigeo.app.map
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,19 +33,28 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
 import org.maplibre.android.style.layers.PropertyFactory.fillColor
 import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
+import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
+import org.maplibre.android.style.layers.PropertyFactory.iconAnchor
+import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
+import org.maplibre.android.style.layers.PropertyFactory.iconImage
+import org.maplibre.android.style.layers.PropertyFactory.iconRotate
+import org.maplibre.android.style.layers.PropertyFactory.iconRotationAlignment
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
 import org.maplibre.android.style.layers.PropertyFactory.lineOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineWidth
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -49,18 +63,30 @@ import org.maplibre.geojson.Point
 import org.maplibre.geojson.Polygon
 
 private const val SRC_POINTS = "trigeo-points"
-private const val SRC_LINES = "trigeo-lines"
+private const val SRC_LINES_SOLID = "trigeo-lines-solid"
+private const val SRC_LINES_PHANTOM = "trigeo-lines-phantom"
 private const val SRC_CONES = "trigeo-cones"
 private const val LYR_POINTS = "trigeo-points-lyr"
-private const val LYR_LINES = "trigeo-lines-lyr"
+private const val LYR_LINES_SOLID = "trigeo-lines-solid-lyr"
+private const val LYR_LINES_PHANTOM = "trigeo-lines-phantom-lyr"
 private const val LYR_CONES = "trigeo-cones-lyr"
+private const val IMG_READING_DOT = "trigeo-reading-dot"
+private const val COLOR_CAPTURED_BEARING = "#000000"
+private const val COLOR_LIVE_BEARING = "#EF4444"
+private const val COLOR_PHANTOM_BEARING = "#374151"
 
 private const val SRC_LIVE_POINT = "trigeo-live-point"
 private const val SRC_LIVE_LINE = "trigeo-live-line"
+private const val SRC_LIVE_LINE_PHANTOM = "trigeo-live-line-phantom"
 private const val SRC_LIVE_CONE = "trigeo-live-cone"
 private const val LYR_LIVE_POINT = "trigeo-live-point-lyr"
 private const val LYR_LIVE_LINE = "trigeo-live-line-lyr"
+private const val LYR_LIVE_LINE_PHANTOM = "trigeo-live-line-phantom-lyr"
 private const val LYR_LIVE_CONE = "trigeo-live-cone-lyr"
+private const val IMG_LIVE_DOT = "trigeo-live-dot"
+private const val IMG_LIVE_DOT_ARROW = "trigeo-live-dot-arrow"
+private const val PROP_BEARING = "bearing"
+private const val PROP_ICON = "icon"
 
 private const val SRC_FIX_POINT = "trigeo-fix-point"
 private const val SRC_FIX_ELLIPSE = "trigeo-fix-ellipse"
@@ -93,7 +119,7 @@ fun OutingMap(
     liveAccuracyMeters: Float?,
     liveBearingDeg: Double?,
     liveUncertaintyDeg: Double,
-    liveBidirectional: Boolean,
+    liveDirection: ReadingDirection,
     tileStyle: MapTileStyle,
     fix: TriangulationFix?,
     pendingPoint: GeoPoint?,
@@ -152,6 +178,42 @@ fun OutingMap(
         val map = mapRef ?: return@LaunchedEffect
         styleRef = null
         map.setStyle(Style.Builder().fromUri(tileStyle.styleUri(context))) { style ->
+            val liveFill = 0xFFF2994A.toInt()
+            val readingFill = 0xFF1F4E79.toInt()
+            val whiteStroke = 0xFFFFFFFF.toInt()
+            style.addImage(
+                IMG_LIVE_DOT,
+                makeDotBitmap(
+                    context,
+                    fillColor = liveFill,
+                    strokeColor = whiteStroke,
+                    dotRadiusDp = 6f,
+                    strokeWidthDp = 1.5f,
+                ),
+            )
+            style.addImage(
+                IMG_LIVE_DOT_ARROW,
+                makeDotBitmap(
+                    context,
+                    fillColor = liveFill,
+                    strokeColor = whiteStroke,
+                    dotRadiusDp = 6f,
+                    strokeWidthDp = 1.5f,
+                    arrowHeightDp = 12f,
+                    arrowBaseDp = 11f,
+                    arrowOverlapDp = 3f,
+                ),
+            )
+            style.addImage(
+                IMG_READING_DOT,
+                makeDotBitmap(
+                    context,
+                    fillColor = readingFill,
+                    strokeColor = whiteStroke,
+                    dotRadiusDp = 7f,
+                    strokeWidthDp = 2f,
+                ),
+            )
             addOverlayLayers(style)
             styleRef = style
         }
@@ -162,9 +224,9 @@ fun OutingMap(
         pushOverlayData(style, readings)
     }
 
-    LaunchedEffect(liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional, styleRef) {
+    LaunchedEffect(liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection, styleRef) {
         val style = styleRef ?: return@LaunchedEffect
-        pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveBidirectional)
+        pushLiveData(style, liveLocation, liveBearingDeg, liveUncertaintyDeg, liveDirection)
     }
 
     LaunchedEffect(liveLocation, liveAccuracyMeters, styleRef) {
@@ -211,10 +273,12 @@ fun OutingMap(
 
 private fun addOverlayLayers(style: Style) {
     style.addSource(GeoJsonSource(SRC_CONES))
-    style.addSource(GeoJsonSource(SRC_LINES))
+    style.addSource(GeoJsonSource(SRC_LINES_SOLID))
+    style.addSource(GeoJsonSource(SRC_LINES_PHANTOM))
     style.addSource(GeoJsonSource(SRC_POINTS))
     style.addSource(GeoJsonSource(SRC_LIVE_CONE))
     style.addSource(GeoJsonSource(SRC_LIVE_LINE))
+    style.addSource(GeoJsonSource(SRC_LIVE_LINE_PHANTOM))
     style.addSource(GeoJsonSource(SRC_LIVE_POINT))
     style.addSource(GeoJsonSource(SRC_FIX_ELLIPSE))
     style.addSource(GeoJsonSource(SRC_FIX_POINT))
@@ -234,10 +298,18 @@ private fun addOverlayLayers(style: Style) {
         ),
     )
     style.addLayer(
-        LineLayer(LYR_LIVE_LINE, SRC_LIVE_LINE).withProperties(
-            lineColor("#1F4E79"),
-            lineWidth(2.5f),
+        LineLayer(LYR_LIVE_LINE_PHANTOM, SRC_LIVE_LINE_PHANTOM).withProperties(
+            lineColor(COLOR_PHANTOM_BEARING),
+            lineWidth(3f),
             lineOpacity(0.7f),
+            lineDasharray(arrayOf(3f, 3f)),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LIVE_LINE, SRC_LIVE_LINE).withProperties(
+            lineColor(COLOR_LIVE_BEARING),
+            lineWidth(3f),
+            lineOpacity(0.85f),
             lineDasharray(arrayOf(3f, 3f)),
         ),
     )
@@ -248,10 +320,18 @@ private fun addOverlayLayers(style: Style) {
         ),
     )
     style.addLayer(
-        LineLayer(LYR_LINES, SRC_LINES).withProperties(
-            lineColor("#1F4E79"),
-            lineWidth(3f),
-            lineOpacity(0.9f),
+        LineLayer(LYR_LINES_PHANTOM, SRC_LINES_PHANTOM).withProperties(
+            lineColor(COLOR_PHANTOM_BEARING),
+            lineWidth(3.5f),
+            lineOpacity(0.75f),
+            lineDasharray(arrayOf(2.5f, 2.5f)),
+        ),
+    )
+    style.addLayer(
+        LineLayer(LYR_LINES_SOLID, SRC_LINES_SOLID).withProperties(
+            lineColor(COLOR_CAPTURED_BEARING),
+            lineWidth(3.5f),
+            lineOpacity(0.95f),
         ),
     )
     style.addLayer(
@@ -268,19 +348,23 @@ private fun addOverlayLayers(style: Style) {
         ),
     )
     style.addLayer(
-        CircleLayer(LYR_POINTS, SRC_POINTS).withProperties(
-            circleRadius(7f),
-            circleColor("#1F4E79"),
-            circleStrokeColor("#FFFFFF"),
-            circleStrokeWidth(2.5f),
+        SymbolLayer(LYR_POINTS, SRC_POINTS).withProperties(
+            iconImage(Expression.get(PROP_ICON)),
+            iconRotate(Expression.get(PROP_BEARING)),
+            iconAnchor(Property.ICON_ANCHOR_CENTER),
+            iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+            iconAllowOverlap(true),
+            iconIgnorePlacement(true),
         ),
     )
     style.addLayer(
-        CircleLayer(LYR_LIVE_POINT, SRC_LIVE_POINT).withProperties(
-            circleRadius(6f),
-            circleColor("#F2994A"),
-            circleStrokeColor("#FFFFFF"),
-            circleStrokeWidth(2f),
+        SymbolLayer(LYR_LIVE_POINT, SRC_LIVE_POINT).withProperties(
+            iconImage(Expression.get(PROP_ICON)),
+            iconRotate(Expression.get(PROP_BEARING)),
+            iconAnchor(Property.ICON_ANCHOR_CENTER),
+            iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+            iconAllowOverlap(true),
+            iconIgnorePlacement(true),
         ),
     )
     style.addLayer(
@@ -391,14 +475,27 @@ private fun pushOverlayData(style: Style, readings: List<Reading>) {
     val visible = readings.filter { it.visible }
 
     val points = visible.map { r ->
-        Feature.fromGeometry(Point.fromLngLat(r.point.longitude, r.point.latitude))
+        Feature.fromGeometry(
+            Point.fromLngLat(r.point.longitude, r.point.latitude),
+        ).apply {
+            addStringProperty(PROP_ICON, IMG_READING_DOT)
+            addNumberProperty(PROP_BEARING, r.bearing.centerDeg)
+        }
     }
     (style.getSource(SRC_POINTS) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(points))
 
-    val lines = visible.flatMap { r ->
-        buildBearingLines(r.point, r.bearing.centerDeg, r.direction)
+    val actualLines = mutableListOf<Feature>()
+    val phantomLines = mutableListOf<Feature>()
+    for (r in visible) {
+        actualLines += buildBearingLines(r.point, r.bearing.centerDeg, r.direction)
+        if (r.direction == ReadingDirection.REVERSED) {
+            phantomLines += buildBearingLines(r.point, r.bearing.centerDeg, ReadingDirection.NORMAL)
+        }
     }
-    (style.getSource(SRC_LINES) as? GeoJsonSource)?.setGeoJson(FeatureCollection.fromFeatures(lines))
+    (style.getSource(SRC_LINES_SOLID) as? GeoJsonSource)
+        ?.setGeoJson(FeatureCollection.fromFeatures(actualLines))
+    (style.getSource(SRC_LINES_PHANTOM) as? GeoJsonSource)
+        ?.setGeoJson(FeatureCollection.fromFeatures(phantomLines))
 
     val cones = visible.flatMap { r ->
         buildConePolygons(r.point, r.bearing.centerDeg, r.bearing.halfWidthDeg, r.direction)
@@ -411,38 +508,107 @@ private fun pushLiveData(
     location: GeoPoint?,
     bearingDeg: Double?,
     uncertaintyDeg: Double,
-    bidirectional: Boolean,
+    direction: ReadingDirection,
 ) {
     val pointSource = style.getSource(SRC_LIVE_POINT) as? GeoJsonSource
     val lineSource = style.getSource(SRC_LIVE_LINE) as? GeoJsonSource
+    val phantomLineSource = style.getSource(SRC_LIVE_LINE_PHANTOM) as? GeoJsonSource
     val coneSource = style.getSource(SRC_LIVE_CONE) as? GeoJsonSource
 
     if (location == null) {
         pointSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
         lineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        phantomLineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
         coneSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
         return
     }
 
-    pointSource?.setGeoJson(
-        FeatureCollection.fromFeatures(
-            listOf(Feature.fromGeometry(Point.fromLngLat(location.longitude, location.latitude))),
-        ),
-    )
+    val livePointIcon = if (bearingDeg != null) IMG_LIVE_DOT_ARROW else IMG_LIVE_DOT
+    val livePointFeature = Feature.fromGeometry(
+        Point.fromLngLat(location.longitude, location.latitude),
+    ).apply {
+        addStringProperty(PROP_ICON, livePointIcon)
+        addNumberProperty(PROP_BEARING, bearingDeg ?: 0.0)
+    }
+    pointSource?.setGeoJson(FeatureCollection.fromFeatures(listOf(livePointFeature)))
 
     if (bearingDeg == null) {
         lineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        phantomLineSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
         coneSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
         return
     }
 
-    val direction =
-        if (bidirectional) ReadingDirection.BIDIRECTIONAL else ReadingDirection.NORMAL
-    val lines = buildBearingLines(location, bearingDeg, direction)
-    lineSource?.setGeoJson(FeatureCollection.fromFeatures(lines))
+    val actualLines = buildBearingLines(location, bearingDeg, direction)
+    lineSource?.setGeoJson(FeatureCollection.fromFeatures(actualLines))
+    val phantomLines = if (direction == ReadingDirection.REVERSED) {
+        buildBearingLines(location, bearingDeg, ReadingDirection.NORMAL)
+    } else {
+        emptyList()
+    }
+    phantomLineSource?.setGeoJson(FeatureCollection.fromFeatures(phantomLines))
 
     val cones = buildConePolygons(location, bearingDeg, uncertaintyDeg / 2.0, direction)
     coneSource?.setGeoJson(FeatureCollection.fromFeatures(cones))
+}
+
+private fun makeDotBitmap(
+    context: Context,
+    fillColor: Int,
+    strokeColor: Int,
+    dotRadiusDp: Float,
+    strokeWidthDp: Float,
+    arrowHeightDp: Float = 0f,
+    arrowBaseDp: Float = 0f,
+    arrowOverlapDp: Float = 0f,
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val r = dotRadiusDp * density
+    val strokePx = strokeWidthDp * density
+    val arrowH = arrowHeightDp * density
+    val arrowBase = arrowBaseDp * density
+    val arrowOverlap = arrowOverlapDp * density
+    val hasArrow = arrowHeightDp > 0f && arrowBaseDp > 0f
+
+    val halfStroke = strokePx / 2f
+    val extentAbove = if (hasArrow) r - arrowOverlap + arrowH + halfStroke else r + halfStroke
+    val extentBelow = r + halfStroke
+    val verticalHalf = maxOf(extentAbove, extentBelow)
+    val halfWidth = maxOf(r, arrowBase / 2f) + halfStroke
+
+    val w = (2f * halfWidth).toInt().coerceAtLeast(1)
+    val h = (2f * verticalHalf).toInt().coerceAtLeast(1)
+    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    val cx = w / 2f
+    val cy = h / 2f
+
+    val combined = Path().apply { addCircle(cx, cy, r, Path.Direction.CW) }
+    if (hasArrow) {
+        val baseY = cy - r + arrowOverlap
+        val apexY = baseY - arrowH
+        val triangle = Path().apply {
+            moveTo(cx, apexY)
+            lineTo(cx + arrowBase / 2f, baseY)
+            lineTo(cx - arrowBase / 2f, baseY)
+            close()
+        }
+        combined.op(triangle, Path.Op.UNION)
+    }
+
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = fillColor
+        style = Paint.Style.FILL
+    }
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = strokeColor
+        style = Paint.Style.STROKE
+        strokeWidth = strokePx
+        strokeJoin = Paint.Join.ROUND
+    }
+    canvas.drawPath(combined, fillPaint)
+    canvas.drawPath(combined, strokePaint)
+    return bmp
 }
 
 private fun effectiveBearings(centerDeg: Double, direction: ReadingDirection): List<Double> =

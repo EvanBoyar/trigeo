@@ -7,6 +7,7 @@ import com.trigeo.app.data.OfflineRegionInfo
 import com.trigeo.app.data.OfflineRegionsRepository
 import com.trigeo.app.data.SettingsRepository
 import com.trigeo.app.domain.Defaults
+import com.trigeo.app.domain.ReadingDirection
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -17,8 +18,8 @@ class SettingsViewModel(
     private val offlineRegionsRepo: OfflineRegionsRepository,
 ) : ViewModel() {
 
-    val defaultBidirectional: StateFlow<Boolean> = repo.defaultBidirectional
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val defaultDirection: StateFlow<ReadingDirection> = repo.defaultDirection
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReadingDirection.NORMAL)
 
     val defaultUncertaintyDeg: StateFlow<Float> = repo.defaultUncertaintyDeg
         .stateIn(
@@ -27,8 +28,8 @@ class SettingsViewModel(
             Defaults.UNCERTAINTY_DEG.toFloat(),
         )
 
-    fun setDefaultBidirectional(value: Boolean) {
-        viewModelScope.launch { repo.setDefaultBidirectional(value) }
+    fun setDefaultDirection(value: ReadingDirection) {
+        viewModelScope.launch { repo.setDefaultDirection(value) }
     }
 
     fun setDefaultUncertaintyDeg(value: Float) {
