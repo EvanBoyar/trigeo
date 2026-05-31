@@ -211,6 +211,19 @@ class TriangulationTest {
     }
 
     @Test
+    fun wide_uncertainty_with_km_scale_geometry_still_produces_a_fix() {
+        // From a real outing where the fix used to come back null: ~1 km between
+        // stations, +/-10 deg cones. IRLS reweighting drops the normal matrix
+        // entries to ~1e-5; the old absolute det threshold killed an otherwise
+        // well-conditioned system.
+        val r1 = reading(40.694296, -73.966026, 289.1417324233176, halfWidthDeg = 10.0)
+        val r2 = reading(40.680389, -73.998093, 9.494456939121369, halfWidthDeg = 10.0)
+        val r3 = reading(40.6998643, -73.9865709, 317.1462703864985, halfWidthDeg = 10.0)
+        val fix = Triangulation.solve(listOf(r1, r2, r3))
+        assertNotNull("fix should be produced for well-posed wide-uncertainty geometry", fix)
+    }
+
+    @Test
     fun best_case_close_readings_give_a_single_digit_meter_ellipse() {
         // Three readings ~100 m out, +/-2.5 deg, 120 deg apart, all on target.
         val r1 = stationAt(eastM = 0.0, northM = 100.0, bearingDeg = 180.0)

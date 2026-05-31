@@ -57,6 +57,13 @@ object Triangulation {
     private const val MAX_IRLS_ITER = 10
     private const val CONVERGENCE_M = 0.1
 
+    // Scale-free "near-singular" test for the 2x2 normal matrix A. For a
+    // well-conditioned A with eigenvalues l1 ~= l2, det(A)/trace(A)^2 ~= 0.25; for
+    // a truly rank-deficient A it is 0. An absolute threshold on det fails when
+    // 1/R^2 weighting shrinks every entry by ~1e-6 to 1e-10, even though the
+    // geometry is fine.
+    private const val SINGULAR_DET_RATIO = 1e-12
+
     private class Row(
         val x: Double,
         val y: Double,
@@ -124,8 +131,9 @@ object Triangulation {
             val res = row.nx * (solX - row.x) + row.ny * (solY - row.y)
             rss += w * res * res
         }
+        val traceA = a00 + a11
         val det = a00 * a11 - a01 * a01
-        if (abs(det) < 1e-9) return null
+        if (traceA <= 0.0 || det < SINGULAR_DET_RATIO * traceA * traceA) return null
         val invDet = 1.0 / det
 
         // Hybrid covariance: absolute floor, inflated by reduced chi-square on
@@ -193,8 +201,9 @@ object Triangulation {
             b0 += w * nDotP * row.nx
             b1 += w * nDotP * row.ny
         }
+        val tr = a00 + a11
         val det = a00 * a11 - a01 * a01
-        if (abs(det) < 1e-9) return null
+        if (tr <= 0.0 || det < SINGULAR_DET_RATIO * tr * tr) return null
         val invDet = 1.0 / det
         return Pair(
             invDet * (a11 * b0 - a01 * b1),
