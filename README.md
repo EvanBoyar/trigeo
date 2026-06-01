@@ -6,6 +6,8 @@ Everything runs locally on your phone.
 
 [If you like, you can thank me with a small donation!](https://buymeacoffee.com/elbow)
 
+[A friend has made an iOS port](https://github.com/morria/trigeo), check it out!
+
 ## The flow
 
 1. **Make an outing.** Each hunt is its own outing. Name it or leave it untitled.
