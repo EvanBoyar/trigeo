@@ -17,6 +17,11 @@ val syncManualToAssets by tasks.registering(Copy::class) {
     from(rootProject.layout.projectDirectory.file("README.md"))
     into(layout.buildDirectory.dir("generated/manual-assets"))
     rename { "manual.md" }
+    // The in-app renderer cannot load repo-relative images, so drop image markup.
+    filter { line ->
+        val t = line.trim()
+        if (t.startsWith("<p") || t.startsWith("</p") || t.startsWith("<img") || t.startsWith("![")) "" else line
+    }
 }
 
 android {
@@ -27,8 +32,8 @@ android {
         applicationId = "com.trigeo.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.2.3"
+        versionCode = 14
+        versionName = "0.2.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
